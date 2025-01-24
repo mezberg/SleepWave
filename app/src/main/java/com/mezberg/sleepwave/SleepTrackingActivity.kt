@@ -46,19 +46,27 @@ class SleepTrackingActivity : AppCompatActivity() {
         if (hasUsageStatsPermission()) {
             analyzeSleepData()
         } else {
-            screenEventsTextView.text = "Please grant usage access permission using the button above"
+            screenEventsTextView.setText(R.string.grant_permission_message)
         }
     }
 
     // This function checks if we have permission to access usage stats
     private fun hasUsageStatsPermission(): Boolean {
         val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        // Get the mode for PACKAGE_USAGE_STATS permission
-        val mode = appOps.checkOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            packageName
-        )
+        val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                packageName
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                packageName
+            )
+        }
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
@@ -273,14 +281,14 @@ class SleepTrackingActivity : AppCompatActivity() {
             displaySleepPeriods(sleepPeriods)
             
         } catch (e: Exception) {
-            screenEventsTextView.text = "Error analyzing sleep data: ${e.message}"
+            screenEventsTextView.setText(getString(R.string.error_analyzing_sleep, e.message))
         }
     }
 
     // Display the calculated sleep periods
     private fun displaySleepPeriods(sleepPeriods: List<ScreenOffPeriod>) {
         if (sleepPeriods.isEmpty()) {
-            screenEventsTextView.text = "No sleep periods detected in the last 14 days"
+            screenEventsTextView.setText(R.string.no_sleep_periods)
             return
         }
 

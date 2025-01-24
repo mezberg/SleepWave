@@ -22,7 +22,7 @@
         style="@style/BlackButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Track Sleep"
+        android:text="@string/track_sleep"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
