@@ -26,6 +26,11 @@ data class ScreenOffPeriod(
 
 class SleepTrackingActivity : AppCompatActivity() {
     
+    companion object {
+        private const val NIGHT_START_HOUR = 19 // 7 PM
+        private const val NIGHT_END_HOUR = 6    // 6 AM
+    }
+    
     // This will hold our TextView where we display the sleep data
     private lateinit var screenEventsTextView: TextView
     
@@ -144,8 +149,8 @@ class SleepTrackingActivity : AppCompatActivity() {
             calendar.time = period.start
             val hour = calendar.get(Calendar.HOUR_OF_DAY)
             
-            // Check if period starts between 7 PM and 6 AM and is longer than 1.5 hours
-            if ((hour >= 19 || hour < 6) && period.duration >= 90) {
+            // Check if period starts between NIGHT_START_HOUR and NIGHT_END_HOUR and is longer than 1.5 hours
+            if ((hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR) && period.duration >= 90) {
                 period.isPotentialSleep = true
             }
         }
@@ -162,13 +167,13 @@ class SleepTrackingActivity : AppCompatActivity() {
         val sleepPeriods = screenOffPeriods.filter { it.isPotentialSleep }.sortedBy { it.start }
         val periodsToRemove = mutableSetOf<ScreenOffPeriod>()
         
-        // Helper function to check if two dates are in the same night (19:00-06:00)
+        // Helper function to check if two dates are in the same night (NIGHT_START_HOUR-NIGHT_END_HOUR)
         fun areSameNight(date1: Date, date2: Date): Boolean {
             val cal1 = Calendar.getInstance().apply { time = date1 }
             val cal2 = Calendar.getInstance().apply { time = date2 }
             
             // If first date is before midnight and second is after, adjust second date back one day
-            if (cal1.get(Calendar.HOUR_OF_DAY) >= 19 && cal2.get(Calendar.HOUR_OF_DAY) < 6) {
+            if (cal1.get(Calendar.HOUR_OF_DAY) >= NIGHT_START_HOUR && cal2.get(Calendar.HOUR_OF_DAY) < NIGHT_END_HOUR) {
                 cal2.add(Calendar.DAY_OF_YEAR, -1)
             }
             
@@ -188,7 +193,7 @@ class SleepTrackingActivity : AppCompatActivity() {
                 )
                 
                 // If periods are more than 0.5 hour apart
-                if (timeBetween > 30) {
+                if (timeBetween > 15) {
                     // Find the shorter period
                     val shorterPeriod = if (currentPeriod.duration < nextPeriod.duration) {
                         currentPeriod
@@ -217,6 +222,14 @@ class SleepTrackingActivity : AppCompatActivity() {
     // Mark additional sleep periods based on proximity to existing sleep periods
     private fun markAdditionalSleeps(screenOffPeriods: List<ScreenOffPeriod>): List<ScreenOffPeriod> {
         var madeChanges: Boolean
+        val calendar = Calendar.getInstance()
+        
+        // Helper function to check if time is outside night period
+        fun isOutsideNightPeriod(date: Date): Boolean {
+            calendar.time = date
+            val hour = calendar.get(Calendar.HOUR_OF_DAY)
+            return hour in NIGHT_END_HOUR until NIGHT_START_HOUR
+        }
         
         do {
             madeChanges = false
@@ -240,8 +253,8 @@ class SleepTrackingActivity : AppCompatActivity() {
                                 break
                             }
                             
-                            // If period is longer than 30 minutes, mark it as sleep
-                            if (nextPeriod.duration > 30) {
+                            // Mark as sleep only if period is longer than 30 minutes and starts outside night period
+                            if (nextPeriod.duration > 30 && isOutsideNightPeriod(nextPeriod.start)) {
                                 nextPeriod.isPotentialSleep = true
                                 madeChanges = true
                                 Log.d("SleepTrackingActivity", "Marked additional sleep period: $nextPeriod (after ${currentPeriod})")
@@ -302,9 +315,9 @@ class SleepTrackingActivity : AppCompatActivity() {
             val cal = Calendar.getInstance()
             cal.time = period.start
             
-            // If sleep started after midnight but before 6 PM,
+            // If sleep started after midnight but before NIGHT_START_HOUR-1,
             // we want to group it with the previous day
-            if (cal.get(Calendar.HOUR_OF_DAY) < 18) {
+            if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_START_HOUR-1) {
                 cal.add(Calendar.DAY_OF_YEAR, -1)
             }
             
