@@ -1,0 +1,35 @@
+package com.mezberg.sleepwave.data
+
+import androidx.room.*
+import kotlinx.coroutines.flow.Flow
+import java.util.*
+
+@Dao
+interface SleepPeriodDao {
+    @Query("SELECT * FROM sleep_periods ORDER BY start DESC")
+    fun getAllSleepPeriods(): Flow<List<SleepPeriodEntity>>
+
+    @Query("SELECT * FROM sleep_periods WHERE id = :id")
+    suspend fun getSleepPeriodById(id: Long): SleepPeriodEntity?
+
+    @Query("SELECT * FROM sleep_periods ORDER BY end DESC LIMIT 1")
+    suspend fun getLatestSleepPeriod(): SleepPeriodEntity?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM sleep_periods WHERE start = :start AND end = :end)")
+    suspend fun doesSleepPeriodExist(start: Date, end: Date): Boolean
+
+    @Insert
+    suspend fun insert(sleepPeriod: SleepPeriodEntity): Long
+
+    @Insert
+    suspend fun insertAll(sleepPeriods: List<SleepPeriodEntity>)
+
+    @Update
+    suspend fun update(sleepPeriod: SleepPeriodEntity)
+
+    @Delete
+    suspend fun delete(sleepPeriod: SleepPeriodEntity)
+
+    @Query("DELETE FROM sleep_periods")
+    suspend fun deleteAll()
+} 

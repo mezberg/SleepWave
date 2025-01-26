@@ -11,6 +11,10 @@ import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.mezberg.sleepwave.data.SleepDatabase
+import com.mezberg.sleepwave.data.SleepPeriodEntity
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -29,14 +33,22 @@ class SleepTrackingActivity : AppCompatActivity() {
     companion object {
         private const val NIGHT_START_HOUR = 19 // 7 PM
         private const val NIGHT_END_HOUR = 6    // 6 AM
+        private const val DEFAULT_DAYS_TO_FETCH = 14L
     }
     
     // This will hold our TextView where we display the sleep data
     private lateinit var screenEventsTextView: TextView
+    private lateinit var database: SleepDatabase
     
+    // Flag to prevent simultaneous execution of analyzeSleepData
+    private var isAnalyzing = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sleep_tracking)
+
+        // Initialize database
+        database = SleepDatabase.getDatabase(this)
 
         // Get reference to our TextView where we'll show the sleep periods
         screenEventsTextView = findViewById(R.id.screenEventsTextView)
@@ -50,6 +62,7 @@ class SleepTrackingActivity : AppCompatActivity() {
         // Try to analyze sleep data if we have permission
         if (hasUsageStatsPermission()) {
             analyzeSleepData()
+            displaySleepPeriods()
         } else {
             screenEventsTextView.setText(R.string.grant_permission_message)
         }
@@ -75,18 +88,22 @@ class SleepTrackingActivity : AppCompatActivity() {
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
-    // This function fetches screen on/off events for the last 14 days
-    private fun fetchScreenUsageEvents(): List<Pair<Long, String>> {
+    private suspend fun checkLatestSleep(): Date? {
+        return try {
+            val latestSleep = database.sleepPeriodDao().getLatestSleepPeriod()
+            Log.d("SleepTrackingActivity", "Latest sleep: ${latestSleep?.end}")
+            latestSleep?.end
+        } catch (e: Exception) {
+            Log.d("SleepTrackingActivity", "Error getting latest sleep: ${e.message}")
+            null
+        }
+    }
+
+    // This function fetches screen on/off events for the specified time range
+    private fun fetchScreenUsageEvents(startTime: Long, endTime: Long): List<Pair<Long, String>> {
         // Get the UsageStatsManager service
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         
-        // Calculate the time range (last 14 days)
-        val calendar = Calendar.getInstance()
-        val endTime = calendar.timeInMillis  // Current time
-        calendar.add(Calendar.DAY_OF_YEAR, -14)  // Go back 14 days
-        val startTime = calendar.timeInMillis
-
-
         // Create a list to store our events
         val screenEvents = mutableListOf<Pair<Long, String>>()
 
@@ -270,97 +287,106 @@ class SleepTrackingActivity : AppCompatActivity() {
 
     // Main function to analyze sleep data
     private fun analyzeSleepData() {
-        try {
-            // Get the screen events
-            val events = fetchScreenUsageEvents()
-            
-            // Convert events to screen off periods
-            val screenOffPeriods = getScreenOffPeriods(events)
-            Log.d("SleepTrackingActivity", "Screen off periods: $screenOffPeriods")
-            // Mark potential sleep periods
-            markSleepPeriods(screenOffPeriods)
-            Log.d("SleepTrackingActivity", "Marked sleep periods: $screenOffPeriods")
-            // Remove false sleep periods
-            val cleanedPeriods = deleteFalseSleeps(screenOffPeriods)
-            Log.d("SleepTrackingActivity", "Cleaned periods: $cleanedPeriods")
-            
-            // Mark additional sleep periods
-            val periodsWithAdditional = markAdditionalSleeps(cleanedPeriods)
-            Log.d("SleepTrackingActivity", "Periods with additional sleep: $periodsWithAdditional")
-            // Get only sleep periods
-            val sleepPeriods = getSleepPeriods(periodsWithAdditional)
-            Log.d("SleepTrackingActivity", "Sleep periods: $sleepPeriods")
-            // Display the results
-            displaySleepPeriods(sleepPeriods)
-            
-        } catch (e: Exception) {
-            screenEventsTextView.setText(getString(R.string.error_analyzing_sleep, e.message))
-        }
-    }
-
-    // Display the calculated sleep periods
-    private fun displaySleepPeriods(sleepPeriods: List<ScreenOffPeriod>) {
-        if (sleepPeriods.isEmpty()) {
-            screenEventsTextView.setText(R.string.no_sleep_periods)
+        // Check if analysis is already running
+        if (isAnalyzing) {
+            Log.d("SleepTrackingActivity", "Sleep analysis already in progress, skipping...")
             return
         }
 
-        // Create date formatters for different display needs
-        val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-        val headerDateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-        
-        // Group sleep periods by date (using the adjusted date logic)
-        val periodsByDate = sleepPeriods.groupBy { period ->
-            // Create calendar for the start time
-            val cal = Calendar.getInstance()
-            cal.time = period.start
+        lifecycleScope.launch {
+            // Set the flag to indicate analysis is starting
+            isAnalyzing = true
             
-            // If sleep started after midnight but before NIGHT_START_HOUR-1,
-            // we want to group it with the previous day
-            if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_START_HOUR-1) {
-                cal.add(Calendar.DAY_OF_YEAR, -1)
+            try {
+                // Get the current time
+                val endTime = System.currentTimeMillis()
+                
+                // Get the start time based on latest sleep or default to 14 days
+                val startTime = checkLatestSleep()?.time ?: run {
+                    val calendar = Calendar.getInstance()
+                    calendar.add(Calendar.DAY_OF_YEAR, -DEFAULT_DAYS_TO_FETCH.toInt())
+                    Log.d("SleepTrackingActivity", "Did not find latest sleep, using default: ${calendar.time}")
+                    calendar.timeInMillis
+                }
+                Log.d("SleepTrackingActivity", "Start time: ${Date(startTime)}")
+                
+                // Get the screen events for the time range
+                val events = fetchScreenUsageEvents(startTime, endTime)
+                Log.d("SleepTrackingActivity", "Fetched ${events.size} events from ${Date(startTime)} to ${Date(endTime)}")
+                
+                // Convert events to screen off periods
+                val screenOffPeriods = getScreenOffPeriods(events)
+                Log.d("SleepTrackingActivity", "Screen off periods: $screenOffPeriods")
+                
+                // Mark potential sleep periods
+                markSleepPeriods(screenOffPeriods)
+                Log.d("SleepTrackingActivity", "Marked sleep periods: $screenOffPeriods")
+                
+                // Remove false sleep periods
+                val cleanedPeriods = deleteFalseSleeps(screenOffPeriods)
+                Log.d("SleepTrackingActivity", "Cleaned periods: $cleanedPeriods")
+                
+                // Mark additional sleep periods
+                val periodsWithAdditional = markAdditionalSleeps(cleanedPeriods)
+                Log.d("SleepTrackingActivity", "Periods with additional sleep: $periodsWithAdditional")
+                
+                // Get only sleep periods
+                val sleepPeriods = getSleepPeriods(periodsWithAdditional)
+                Log.d("SleepTrackingActivity", "Sleep periods: $sleepPeriods")
+
+                // Save new sleep periods to database
+                saveSleepPeriodsToDatabase(sleepPeriods)
+                
+            } catch (e: Exception) {
+                Log.e("SleepTrackingActivity", "Error analyzing sleep data: ${e.message}")
+                screenEventsTextView.setText(getString(R.string.error_analyzing_sleep, e.message))
+            } finally {
+                // Reset the flag in finally block to ensure it's always reset, even if an error occurs
+                isAnalyzing = false
+                Log.d("SleepTrackingActivity", "Sleep analysis completed")
+            }
+        }
+    }
+
+    //Converts a ScreenOffPeriod (class) to a SleepPeriodEntity which is a Room entity
+    private fun convertToEntity(screenOffPeriod: ScreenOffPeriod): SleepPeriodEntity {
+        return SleepPeriodEntity(
+            start = screenOffPeriod.start,
+            end = screenOffPeriod.end,
+            duration = screenOffPeriod.duration,
+            isPotentialSleep = screenOffPeriod.isPotentialSleep
+        )
+    }
+
+    //Saves the detected sleep periods to the database. Only saves periods that don't already exist in the database
+    private suspend fun saveSleepPeriodsToDatabase(sleepPeriods: List<ScreenOffPeriod>) {
+        try {
+            // Get the DAO (Data Access Object) for database operations
+            val sleepPeriodDao = database.sleepPeriodDao()
+            
+            // Counter for new periods added
+            var newPeriodsCount = 0
+            
+            // Process each sleep period
+            for (period in sleepPeriods) {
+                // Check if this period already exists in the database
+                val exists = sleepPeriodDao.doesSleepPeriodExist(period.start, period.end)
+                Log.d("SleepTrackingActivity", "Checking if sleep period exists, sleep period start: ${period.start}, end: ${period.end}")
+                if (!exists) {
+                    // Convert the period to a database entity and insert it
+                    val entity = convertToEntity(period)
+                    sleepPeriodDao.insert(entity)
+                    newPeriodsCount++
+                    Log.d("SleepTrackingActivity", "Saved new sleep period: $period")
+                } else {
+                    Log.d("SleepTrackingActivity", "Sleep period already exists: $period")
+                }
             }
             
-            // Return the date without time as the key
-            cal.set(Calendar.HOUR_OF_DAY, 0)
-            cal.set(Calendar.MINUTE, 0)
-            cal.set(Calendar.SECOND, 0)
-            cal.set(Calendar.MILLISECOND, 0)
-            cal.time
+            Log.d("SleepTrackingActivity", "Saved $newPeriodsCount new sleep periods to database")
+        } catch (e: Exception) {
+            Log.e("SleepTrackingActivity", "Error saving sleep periods to database: ${e.message}")
         }
-        
-        // Build the display text
-        val displayText = StringBuilder()
-        
-        // Sort the dates in descending order (most recent first)
-        periodsByDate.keys.sortedDescending().forEach { date ->
-            val periodsForDate = periodsByDate[date] ?: return@forEach
-            
-            // Add date header
-            displayText.append("${headerDateFormat.format(date)}\n\n")
-            
-            // Add each sleep period for this date
-            periodsForDate.forEach { period ->
-                displayText.append("""
-                    From: ${dateFormat.format(period.start)}
-                    To: ${dateFormat.format(period.end)}
-                    Duration: ${period.duration / 60} hours ${period.duration % 60} minutes
-                    
-                    """.trimIndent())
-                displayText.append("\n")
-            }
-            
-            // Calculate and add total sleep for this date
-            val totalMinutes = periodsForDate.sumOf { it.duration }
-            val totalHours = totalMinutes / 60
-            val remainingMinutes = totalMinutes % 60
-            
-            displayText.append("Total sleep: $totalHours hours $remainingMinutes minutes\n")
-            displayText.append("----------------------------------------\n\n")
-        }
-        
-        // Show the results
-        screenEventsTextView.text = displayText.toString()
     }
 
     // When we resume the activity (e.g., coming back from permission settings)
@@ -369,6 +395,82 @@ class SleepTrackingActivity : AppCompatActivity() {
         // Check permission and update display if needed
         if (hasUsageStatsPermission()) {
             analyzeSleepData()
+            displaySleepPeriods()
+        }
+    }
+
+    //Displays all sleep periods from the database
+    private fun displaySleepPeriods() {
+        lifecycleScope.launch {
+            try {
+                // Get all sleep periods from database as Flow
+                database.sleepPeriodDao().getAllSleepPeriods().collect { sleepPeriods ->
+                    if (sleepPeriods.isEmpty()) {
+                        screenEventsTextView.setText(R.string.no_sleep_periods)
+                        return@collect
+                    }
+
+                    // Create date formatters for different display needs
+                    val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+                    val headerDateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+                    
+                    // Group sleep periods by date (using the adjusted date logic)
+                    val periodsByDate = sleepPeriods.groupBy { period ->
+                        // Create calendar for the start time
+                        val cal = Calendar.getInstance()
+                        cal.time = period.start
+                        
+                        // If sleep started after midnight but before NIGHT_START_HOUR-1,
+                        // we want to group it with the previous day
+                        if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_START_HOUR-1) {
+                            cal.add(Calendar.DAY_OF_YEAR, -1)
+                        }
+                        
+                        // Return the date without time as the key
+                        cal.set(Calendar.HOUR_OF_DAY, 0)
+                        cal.set(Calendar.MINUTE, 0)
+                        cal.set(Calendar.SECOND, 0)
+                        cal.set(Calendar.MILLISECOND, 0)
+                        cal.time
+                    }
+                    
+                    // Build the display text
+                    val displayText = StringBuilder()
+                    
+                    // Sort the dates in descending order (most recent first)
+                    periodsByDate.keys.sortedDescending().forEach { date ->
+                        val periodsForDate = periodsByDate[date] ?: return@forEach
+                        
+                        // Add date header
+                        displayText.append("${headerDateFormat.format(date)}\n\n")
+                        
+                        // Add each sleep period for this date
+                        periodsForDate.forEach { period ->
+                            displayText.append("""
+                                From: ${dateFormat.format(period.start)}
+                                To: ${dateFormat.format(period.end)}
+                                Duration: ${period.duration / 60} hours ${period.duration % 60} minutes
+                                
+                                """.trimIndent())
+                            displayText.append("\n")
+                        }
+                        
+                        // Calculate and add total sleep for this date
+                        val totalMinutes = periodsForDate.sumOf { it.duration }
+                        val totalHours = totalMinutes / 60
+                        val remainingMinutes = totalMinutes % 60
+                        
+                        displayText.append("Total sleep: $totalHours hours $remainingMinutes minutes\n")
+                        displayText.append("----------------------------------------\n\n")
+                    }
+                    
+                    // Show the results
+                    screenEventsTextView.text = displayText.toString()
+                }
+            } catch (e: Exception) {
+                Log.e("SleepTrackingActivity", "Error displaying sleep periods: ${e.message}")
+                screenEventsTextView.setText(getString(R.string.error_analyzing_sleep, e.message))
+            }
         }
     }
 } 
