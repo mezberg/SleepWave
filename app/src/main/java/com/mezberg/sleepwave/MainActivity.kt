@@ -1,17 +1,20 @@
 package com.mezberg.sleepwave
 
-import android.content.Intent
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
-import android.widget.Button
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.navigation.compose.rememberNavController
+import com.mezberg.sleepwave.navigation.SleepWaveNavigation
+import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        findViewById<Button>(R.id.trackSleepButton).setOnClickListener {
-            startActivity(Intent(this, SleepTrackingActivity::class.java))
+        setContent {
+            SleepWaveTheme {
+                val navController = rememberNavController()
+                SleepWaveNavigation(navController = navController)
+            }
         }
     }
 }
