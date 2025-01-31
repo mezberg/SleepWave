@@ -3,6 +3,7 @@ package com.mezberg.sleepwave.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +19,7 @@ import com.mezberg.sleepwave.viewmodel.SleepTrackingUiState
 import java.text.SimpleDateFormat
 import java.util.*
 
+
 @Composable
 fun SleepTrackingScreen(
     uiState: SleepTrackingUiState,
@@ -31,7 +33,7 @@ fun SleepTrackingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -39,7 +41,7 @@ fun SleepTrackingScreen(
                 style = MaterialTheme.typography.headlineLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(vertical = 24.dp)
             )
 
             if (!uiState.hasPermission) {
@@ -95,6 +97,7 @@ private fun SleepPeriodsList(
     } else {
         LazyColumn(
             modifier = modifier,
+            contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(sleepPeriods) { dayData ->
@@ -111,7 +114,8 @@ private fun DaySleepCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),

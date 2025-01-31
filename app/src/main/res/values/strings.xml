@@ -1,9 +1,11 @@
 <resources>
     <string name="app_name">SleepWave</string>
-    <string name="track_sleep">Track Sleep</string>
     <string name="sleep_tracking">Sleep Tracking</string>
     <string name="grant_usage_access">Grant Usage Access</string>
     <string name="no_sleep_periods">No sleep periods detected in the last 14 days</string>
     <string name="error_analyzing_sleep">Error analyzing sleep data: %1$s</string>
     <string name="grant_permission_message">Please grant usage access permission using the button above</string>
+    <string name="home">Home</string>
+    <string name="analysis">Analysis</string>
+    <string name="settings">Settings</string>
 </resources>

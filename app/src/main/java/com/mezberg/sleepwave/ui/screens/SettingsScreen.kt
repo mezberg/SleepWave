@@ -14,7 +14,7 @@ import com.mezberg.sleepwave.R
 import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 
 @Composable
-fun MainScreen(
+fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -26,7 +26,7 @@ fun MainScreen(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = stringResource(R.string.app_name),
+                text = stringResource(R.string.settings),
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -36,8 +36,8 @@ fun MainScreen(
 
 @Preview(showBackground = true)
 @Composable
-fun MainScreenPreview() {
+fun SettingsScreenPreview() {
     SleepWaveTheme {
-        MainScreen()
+        SettingsScreen()
     }
 } 
