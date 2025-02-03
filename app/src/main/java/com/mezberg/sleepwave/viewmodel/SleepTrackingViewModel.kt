@@ -52,8 +52,8 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
     val uiState: StateFlow<SleepTrackingUiState> = _uiState.asStateFlow()
 
     companion object {
-        private const val NIGHT_START_HOUR = 19 // 7 PM
-        private const val NIGHT_END_HOUR = 6    // 6 AM
+        const val NIGHT_START_HOUR = 19 // 7 PM
+        const val NIGHT_END_HOUR = 6 // 6 AM
         private const val DEFAULT_DAYS_TO_FETCH = 14L
     }
 
@@ -278,23 +278,34 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
                     val groupedPeriods = periods.groupBy { period ->
                         val cal = Calendar.getInstance()
                         cal.time = period.start
-                        if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_START_HOUR) {
+                        if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_END_HOUR) {
                             cal.add(Calendar.DAY_OF_YEAR, -1)
                         }
                         cal.set(Calendar.HOUR_OF_DAY, 0)
                         cal.set(Calendar.MINUTE, 0)
                         cal.set(Calendar.SECOND, 0)
                         cal.set(Calendar.MILLISECOND, 0)
-                        SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(cal.time)
+                        cal.time
                     }.map { (date, periodsForDate) ->
+                        val dateFormat = SimpleDateFormat("MMM d", Locale.getDefault())
+                        val nextDay = Calendar.getInstance().apply {
+                            time = date
+                            add(Calendar.DAY_OF_YEAR, 1)
+                        }
+                        val displayDate = "${dateFormat.format(date)} - ${dateFormat.format(nextDay.time)}"
+                        
                         val totalMinutes = periodsForDate.sumOf { it.duration }
                         SleepPeriodDisplayData(
-                            date = date,
+                            date = displayDate,
                             periods = periodsForDate,
                             totalSleepHours = totalMinutes.toInt() / 60,
                             totalSleepMinutes = totalMinutes.toInt() % 60
                         )
-                    }.sortedByDescending { it.date }
+                    }.sortedByDescending { 
+                        // Sort by the actual date, not the display string
+                        val parts = it.date.split(" - ")[0].trim()
+                        SimpleDateFormat("MMM d", Locale.getDefault()).parse(parts)?.time ?: 0L
+                    }
 
                     _uiState.value = _uiState.value.copy(
                         sleepPeriods = groupedPeriods,

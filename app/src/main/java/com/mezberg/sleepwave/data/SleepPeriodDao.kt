@@ -18,6 +18,9 @@ interface SleepPeriodDao {
     @Query("SELECT EXISTS(SELECT 1 FROM sleep_periods WHERE start = :start AND end = :end)")
     suspend fun doesSleepPeriodExist(start: Date, end: Date): Boolean
 
+    @Query("SELECT * FROM sleep_periods WHERE start BETWEEN :startDate AND :endDate ORDER BY start DESC")
+    suspend fun getSleepPeriodsBetweenDates(startDate: Date, endDate: Date): List<SleepPeriodEntity>
+
     @Insert
     suspend fun insert(sleepPeriod: SleepPeriodEntity): Long
 
