@@ -71,7 +71,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true)
 
-                // Get all sleep periods from the last 14 days
+                // Get all sleep periods
                 val endDate = Calendar.getInstance()
                 val startDate = Calendar.getInstance().apply {
                     add(Calendar.DAY_OF_YEAR, -DAYS_TO_ANALYZE.toInt())
@@ -86,7 +86,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 val dailySleepMap = sleepPeriods.groupBy { period ->
                     val cal = Calendar.getInstance()
                     cal.time = period.start
-                    if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_END_HOUR) { // If sleep started before 6 AM, count it for previous day
+                    if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_START_HOUR) { // If sleep started before 19 PM, count it for previous day
                         cal.add(Calendar.DAY_OF_YEAR, -1)
                     }
                     cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -104,10 +104,9 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 // Get the current date, adjusted for night logic
                 val currentDate = Calendar.getInstance()
                 val currentHour = currentDate.get(Calendar.HOUR_OF_DAY)
-                // If it's before 19PM, we're still in the previous day's night
-                if (currentHour < NIGHT_START_HOUR) {
-                    currentDate.add(Calendar.DAY_OF_YEAR, -1)
-                }
+                // Adjustment: we're still in the previous day -> calculate correctly because night counts as previous day
+                currentDate.add(Calendar.DAY_OF_YEAR, -1)
+                
                 currentDate.set(Calendar.HOUR_OF_DAY, 0)
                 currentDate.set(Calendar.MINUTE, 0)
                 currentDate.set(Calendar.SECOND, 0)
@@ -123,12 +122,31 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                     currentDate.add(Calendar.DAY_OF_YEAR, -1)
                 }
 
-                for (i in 0 until DAYS_TO_ANALYZE.toInt()) {
+                // Find the earliest date with sleep data
+                val earliestSleepDate = dailySleepMap.keys.minOrNull()
+                if (earliestSleepDate == null) {
+                    _uiState.value = _uiState.value.copy(
+                        sleepDebtInfo = null,
+                        isLoading = false
+                    )
+                    return@launch
+                }
+
+                // Calculate how many days to analyze based on available data
+                val daysToAnalyze = ((currentDate.timeInMillis - earliestSleepDate.time) / (24 * 60 * 60 * 1000)).toInt()
+                val daysToUse = minOf(daysToAnalyze + 1, DAYS_TO_ANALYZE.toInt())
+
+                for (i in 0 until daysToUse) {
                     val cal = Calendar.getInstance()
                     cal.timeInMillis = currentDate.timeInMillis  // Start from adjusted current date
                     cal.add(Calendar.DAY_OF_YEAR, -i)
                     
                     val date = cal.time
+                    // Skip if this date is before our earliest sleep data
+                    if (date.before(earliestSleepDate)) {
+                        break
+                    }
+
                     val sleepPeriodsForDay = dailySleepMap[date] ?: emptyList()
                     Log.d("MainScreenViewModel", "Sleep periods for day: $sleepPeriodsForDay")
                     val totalSleepHours = sleepPeriodsForDay.sumOf { it.duration } / 60.0 // Convert minutes to hours

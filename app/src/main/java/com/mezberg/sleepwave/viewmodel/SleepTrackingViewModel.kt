@@ -278,7 +278,7 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
                     val groupedPeriods = periods.groupBy { period ->
                         val cal = Calendar.getInstance()
                         cal.time = period.start
-                        if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_END_HOUR) {
+                        if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_START_HOUR) {
                             cal.add(Calendar.DAY_OF_YEAR, -1)
                         }
                         cal.set(Calendar.HOUR_OF_DAY, 0)
