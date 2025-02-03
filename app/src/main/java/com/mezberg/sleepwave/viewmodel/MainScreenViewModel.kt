@@ -54,6 +54,16 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         calculateSleepDebt()
+        // Recalculate after a delay to ensure new sleep data is captured
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(800) // Wait for 800ms
+            calculateSleepDebt()
+        }
+    }
+
+    // Add a public function to manually trigger recalculation
+    fun refreshSleepDebt() {
+        calculateSleepDebt()
     }
 
     private fun calculateSleepDebt() {
@@ -94,8 +104,8 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 // Get the current date, adjusted for night logic
                 val currentDate = Calendar.getInstance()
                 val currentHour = currentDate.get(Calendar.HOUR_OF_DAY)
-                // If it's before 6 AM, we're still in the previous day's night
-                if (currentHour < NIGHT_END_HOUR) {
+                // If it's before 19PM, we're still in the previous day's night
+                if (currentHour < NIGHT_START_HOUR) {
                     currentDate.add(Calendar.DAY_OF_YEAR, -1)
                 }
                 currentDate.set(Calendar.HOUR_OF_DAY, 0)

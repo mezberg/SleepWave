@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -26,6 +27,11 @@ fun MainScreen(
     viewModel: MainScreenViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Refresh data when screen becomes active
+    LaunchedEffect(Unit) {
+        viewModel.refreshSleepDebt()
+    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
