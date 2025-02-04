@@ -148,7 +148,7 @@ private fun AddSleepPeriodDialog(
     fun showDatePicker(isStartDate: Boolean) {
         val initialCalendar = Calendar.getInstance()
         state.startDate?.let { initialCalendar.time = it }
-
+        
         DatePickerDialog(
             context,
             R.style.Theme_SleepWave_DatePicker,
@@ -163,11 +163,16 @@ private fun AddSleepPeriodDialog(
             initialCalendar.get(Calendar.YEAR),
             initialCalendar.get(Calendar.MONTH),
             initialCalendar.get(Calendar.DAY_OF_MONTH)
-        ).show()
+        ).apply {
+            // Set the maximum date to current date
+            datePicker.maxDate = System.currentTimeMillis()
+        }.show()
     }
 
     // Time Picker Dialog
     fun showTimePicker(isStartTime: Boolean) {
+        val currentTime = Calendar.getInstance()
+        
         TimePickerDialog(
             context,
             R.style.Theme_SleepWave_TimePicker,
@@ -179,10 +184,26 @@ private fun AddSleepPeriodDialog(
                     state = state.copy(endTime = time)
                 }
             },
-            calendar.get(Calendar.HOUR_OF_DAY),
-            calendar.get(Calendar.MINUTE),
+            currentTime.get(Calendar.HOUR_OF_DAY),
+            currentTime.get(Calendar.MINUTE),
             true // 24-hour format
         ).show()
+    }
+
+    var showErrorDialog by remember { mutableStateOf<String?>(null) }
+    
+    // Error Dialog for Date/Time Selection
+    showErrorDialog?.let { errorMessage ->
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = null },
+            title = { Text("Invalid Selection") },
+            text = { Text(errorMessage) },
+            confirmButton = {
+                TextButton(onClick = { showErrorDialog = null }) {
+                    Text("OK")
+                }
+            }
+        )
     }
     
     AlertDialog(

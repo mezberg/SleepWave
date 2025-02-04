@@ -397,6 +397,12 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
         object TooLong : AddSleepPeriodError() {
             override val message: String = "Sleep period cannot be longer than 24 hours"
         }
+        object FutureDateTime : AddSleepPeriodError() {
+            override val message: String = "Cannot select future dates or times"
+        }
+        object EndBeforeStart : AddSleepPeriodError() {
+            override val message: String = "End time cannot be before start time"
+        }
     }
 
     private suspend fun validateNewSleepPeriod(
@@ -427,9 +433,15 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
             calendar.set(Calendar.MILLISECOND, 0)
             val finalEndDate = calendar.time
 
+            // Check if dates are in the future
+            val currentTime = System.currentTimeMillis()
+            if (finalStartDate.time > currentTime || finalEndDate.time > currentTime) {
+                return Result.failure(AddSleepPeriodError.FutureDateTime)
+            }
+
             // Check if end date is before start date
             if (finalEndDate.before(finalStartDate)) {
-                return Result.failure(IllegalArgumentException("End time cannot be before start time"))
+                return Result.failure(AddSleepPeriodError.EndBeforeStart)
             }
 
             // Check if period is longer than 24 hours
