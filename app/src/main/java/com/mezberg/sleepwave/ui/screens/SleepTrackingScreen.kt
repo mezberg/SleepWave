@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -112,6 +116,8 @@ private fun DaySleepCard(
     dayData: SleepPeriodDisplayData,
     modifier: Modifier = Modifier
 ) {
+    var isEditMode by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -121,24 +127,81 @@ private fun DaySleepCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = dayData.date,
-                style = MaterialTheme.typography.titleMedium
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = dayData.date,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                
+                IconButton(
+                    onClick = { isEditMode = !isEditMode },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = if (isEditMode) "Exit edit mode" else "Enter edit mode",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
 
             dayData.periods.forEach { period ->
                 val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-                Text(
-                    text = "${dateFormat.format(period.start)} - ${dateFormat.format(period.end)}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${dateFormat.format(period.start)} - ${dateFormat.format(period.end)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        
+                    )
+                    
+                    if (isEditMode) {
+                        Spacer(modifier = Modifier.width(16.dp))
+                        IconButton(
+                            onClick = { /* TODO: Implement delete functionality */ },
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete sleep period",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
             }
 
-            Text(
-                text = "Total sleep: ${dayData.totalSleepHours}h ${dayData.totalSleepMinutes}m",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Total sleep: ${dayData.totalSleepHours}h ${dayData.totalSleepMinutes}m",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                if (isEditMode) {
+                    IconButton(
+                        onClick = { /* TODO: Implement add functionality */ },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add sleep period",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
         }
     }
 }
