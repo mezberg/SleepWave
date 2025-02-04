@@ -21,6 +21,17 @@ interface SleepPeriodDao {
     @Query("SELECT * FROM sleep_periods WHERE start BETWEEN :startDate AND :endDate ORDER BY start DESC")
     suspend fun getSleepPeriodsBetweenDates(startDate: Date, endDate: Date): List<SleepPeriodEntity>
 
+    @Query("""
+        SELECT EXISTS(
+            SELECT 1 FROM sleep_periods 
+            WHERE (start BETWEEN :newStart AND :newEnd) 
+            OR (end BETWEEN :newStart AND :newEnd)
+            OR (:newStart BETWEEN start AND end)
+            OR (:newEnd BETWEEN start AND end)
+        )
+    """)
+    suspend fun hasOverlappingPeriods(newStart: Date, newEnd: Date): Boolean
+
     @Insert
     suspend fun insert(sleepPeriod: SleepPeriodEntity): Long
 

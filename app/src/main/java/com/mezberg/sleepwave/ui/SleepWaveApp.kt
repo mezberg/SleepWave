@@ -89,6 +89,13 @@ fun SleepWaveApp() {
                         onDeleteSleepPeriod = { sleepPeriod ->
                             sleepTrackingViewModel.deleteSleepPeriod(sleepPeriod)
                             mainScreenViewModel.refreshSleepDebt()
+                        },
+                        onAddSleepPeriod = { startDate, startTime, endDate, endTime ->
+                            sleepTrackingViewModel.addSleepPeriod(startDate, startTime, endDate, endTime).also {
+                                if (it.isSuccess) {
+                                    mainScreenViewModel.refreshSleepDebt()
+                                }
+                            }
                         }
                     )
                 }

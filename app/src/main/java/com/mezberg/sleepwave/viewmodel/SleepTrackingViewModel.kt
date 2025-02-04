@@ -389,4 +389,96 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
             }
         }
     }
+
+    sealed class AddSleepPeriodError : Exception() {
+        object Overlap : AddSleepPeriodError() {
+            override val message: String = "Sleep period overlaps with existing period"
+        }
+        object TooLong : AddSleepPeriodError() {
+            override val message: String = "Sleep period cannot be longer than 24 hours"
+        }
+    }
+
+    private suspend fun validateNewSleepPeriod(
+        startDate: Date,
+        startTime: String,
+        endDate: Date,
+        endTime: String
+    ): Result<Pair<Date, Date>> {
+        try {
+            // Combine dates and times
+            val calendar = Calendar.getInstance()
+            
+            // Set start date and time
+            calendar.time = startDate
+            val (startHour, startMinute) = startTime.split(":").map { it.toInt() }
+            calendar.set(Calendar.HOUR_OF_DAY, startHour)
+            calendar.set(Calendar.MINUTE, startMinute)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            val finalStartDate = calendar.time
+
+            // Set end date and time
+            calendar.time = endDate
+            val (endHour, endMinute) = endTime.split(":").map { it.toInt() }
+            calendar.set(Calendar.HOUR_OF_DAY, endHour)
+            calendar.set(Calendar.MINUTE, endMinute)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            val finalEndDate = calendar.time
+
+            // Check if end date is before start date
+            if (finalEndDate.before(finalStartDate)) {
+                return Result.failure(IllegalArgumentException("End time cannot be before start time"))
+            }
+
+            // Check if period is longer than 24 hours
+            val durationHours = (finalEndDate.time - finalStartDate.time) / (1000 * 60 * 60.0)
+            if (durationHours > 24) {
+                return Result.failure(AddSleepPeriodError.TooLong)
+            }
+
+            // Check for overlapping periods
+            if (database.sleepPeriodDao().hasOverlappingPeriods(finalStartDate, finalEndDate)) {
+                return Result.failure(AddSleepPeriodError.Overlap)
+            }
+
+            return Result.success(Pair(finalStartDate, finalEndDate))
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+    }
+
+    suspend fun addSleepPeriod(
+        startDate: Date,
+        startTime: String,
+        endDate: Date,
+        endTime: String
+    ): Result<Unit> {
+        return try {
+            val validationResult = validateNewSleepPeriod(startDate, startTime, endDate, endTime)
+            
+            validationResult.fold(
+                onSuccess = { (finalStartDate, finalEndDate) ->
+                    val duration = (finalEndDate.time - finalStartDate.time) / (1000 * 60) // Convert to minutes
+
+                    val newPeriod = SleepPeriodEntity(
+                        start = finalStartDate,
+                        end = finalEndDate,
+                        duration = duration,
+                        isPotentialSleep = true
+                    )
+
+                    database.sleepPeriodDao().insert(newPeriod)
+                    loadSleepPeriods() // Refresh UI
+                    Result.success(Unit)
+                },
+                onFailure = { error ->
+                    Result.failure(error)
+                }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 } 
