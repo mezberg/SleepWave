@@ -375,4 +375,18 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
+
+    fun deleteSleepPeriod(sleepPeriod: SleepPeriodEntity) {
+        viewModelScope.launch {
+            try {
+                database.sleepPeriodDao().delete(sleepPeriod)
+                loadSleepPeriods() // Refresh the UI after deletion
+                kotlinx.coroutines.delay(100) // Small delay to ensure deletion is complete
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Failed to delete sleep period: ${e.message}"
+                )
+            }
+        }
+    }
 } 

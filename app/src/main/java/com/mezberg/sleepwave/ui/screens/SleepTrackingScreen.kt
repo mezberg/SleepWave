@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mezberg.sleepwave.R
+import com.mezberg.sleepwave.data.SleepPeriodEntity
 import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.SleepPeriodDisplayData
 import com.mezberg.sleepwave.viewmodel.SleepTrackingUiState
@@ -28,6 +29,7 @@ import java.util.*
 fun SleepTrackingScreen(
     uiState: SleepTrackingUiState,
     onPermissionRequest: () -> Unit,
+    onDeleteSleepPeriod: (SleepPeriodEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -75,6 +77,7 @@ fun SleepTrackingScreen(
             if (!uiState.isLoading && uiState.error == null) {
                 SleepPeriodsList(
                     sleepPeriods = uiState.sleepPeriods,
+                    onDeleteSleepPeriod = onDeleteSleepPeriod,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -85,6 +88,7 @@ fun SleepTrackingScreen(
 @Composable
 private fun SleepPeriodsList(
     sleepPeriods: List<SleepPeriodDisplayData>,
+    onDeleteSleepPeriod: (SleepPeriodEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (sleepPeriods.isEmpty()) {
@@ -105,7 +109,10 @@ private fun SleepPeriodsList(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(sleepPeriods) { dayData ->
-                DaySleepCard(dayData = dayData)
+                DaySleepCard(
+                    dayData = dayData,
+                    onDeleteSleepPeriod = onDeleteSleepPeriod
+                )
             }
         }
     }
@@ -114,9 +121,42 @@ private fun SleepPeriodsList(
 @Composable
 private fun DaySleepCard(
     dayData: SleepPeriodDisplayData,
+    onDeleteSleepPeriod: (SleepPeriodEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isEditMode by remember { mutableStateOf(false) }
+    var sleepPeriodToDelete by remember { mutableStateOf<SleepPeriodEntity?>(null) }
+
+    // Confirmation Dialog
+    sleepPeriodToDelete?.let { period ->
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val dateFormat = SimpleDateFormat("MMM d", Locale.getDefault())
+        AlertDialog(
+            onDismissRequest = { sleepPeriodToDelete = null },
+            title = { Text("Confirm Deletion") },
+            text = { 
+                Text(
+                    "Do you want to delete sleep period on \n" +
+                    "${dateFormat.format(period.start)} from ${timeFormat.format(period.start)} to ${timeFormat.format(period.end)}?"
+                ) 
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteSleepPeriod(period)
+                        sleepPeriodToDelete = null
+                    }
+                ) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sleepPeriodToDelete = null }) {
+                    Text("No")
+                }
+            }
+        )
+    }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -159,13 +199,12 @@ private fun DaySleepCard(
                     Text(
                         text = "${dateFormat.format(period.start)} - ${dateFormat.format(period.end)}",
                         style = MaterialTheme.typography.bodyMedium,
-                        
                     )
                     
                     if (isEditMode) {
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
-                            onClick = { /* TODO: Implement delete functionality */ },
+                            onClick = { sleepPeriodToDelete = period },
                             modifier = Modifier.size(18.dp)
                         ) {
                             Icon(
@@ -221,7 +260,8 @@ fun SleepTrackingScreenPreview() {
                     )
                 )
             ),
-            onPermissionRequest = {}
+            onPermissionRequest = {},
+            onDeleteSleepPeriod = {}
         )
     }
 } 

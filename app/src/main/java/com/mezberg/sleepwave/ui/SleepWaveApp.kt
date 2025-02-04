@@ -30,12 +30,15 @@ import com.mezberg.sleepwave.ui.screens.SettingsScreen
 import com.mezberg.sleepwave.ui.screens.SleepTrackingScreen
 import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.SleepTrackingViewModel
+import com.mezberg.sleepwave.viewmodel.MainScreenViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun SleepWaveApp() {
     SleepWaveTheme {
         val navController = rememberNavController()
         val sleepTrackingViewModel: SleepTrackingViewModel = viewModel()
+        val mainScreenViewModel: MainScreenViewModel = viewModel()
         val context = LocalContext.current
 
         Scaffold(
@@ -82,6 +85,10 @@ fun SleepWaveApp() {
                         uiState = uiState,
                         onPermissionRequest = {
                             context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                        },
+                        onDeleteSleepPeriod = { sleepPeriod ->
+                            sleepTrackingViewModel.deleteSleepPeriod(sleepPeriod)
+                            mainScreenViewModel.refreshSleepDebt()
                         }
                     )
                 }
