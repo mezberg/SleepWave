@@ -35,39 +35,34 @@ fun SleepDebtCycle(
 ) {
     Canvas(
         modifier = modifier
-            .size(200.dp)
+            .size(300.dp)
             .padding(16.dp)
     ) {
         val canvasWidth = size.width
         val canvasHeight = size.height
-        val radius = min(canvasWidth, canvasHeight) / 2
+        val maxRadius = min(canvasWidth, canvasHeight) / 1.2f
         val center = Offset(canvasWidth / 2, canvasHeight / 2)
         val strokeWidth = 20f
+        val dotRadius = 5f
 
-        // Draw background circle (empty)
-        drawCircle(
-            color = Color.LightGray.copy(alpha = 0.3f),
-            radius = radius,
-            center = center,
-            style = Stroke(width = strokeWidth)
-        )
-
-        // Draw filled circle based on sleep debt (remember sleep debt is negative)
-        val sweepAngle = if (-sleepDebt > 0 && maxSleepDebt > 0) {
-            (sleepDebt / maxSleepDebt) * 360f
+        if (-sleepDebt <= 0) {
+            // Draw dot when sleep debt is negative or zero
+            drawCircle(
+                color = Color.Black,
+                radius = dotRadius,
+                center = center
+            )
         } else {
-            0f
+            // Draw circle with radius proportional to sleep debt
+            val radius = (-sleepDebt * maxRadius / 12f).coerceAtMost(maxRadius) // Scale factor of 12 hours
+            
+            drawCircle(
+                color = Color.Black,
+                radius = radius,
+                center = center,
+                style = Stroke(width = strokeWidth)
+            )
         }
-
-        drawArc(
-            color = Color.Black,
-            startAngle = -90f,
-            sweepAngle = -sweepAngle,
-            useCenter = false,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = Size(radius * 2, radius * 2),
-            style = Stroke(width = strokeWidth)
-        )
     }
 }
 
