@@ -82,18 +82,9 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                     endDate.time
                 )
 
-                // Group sleep periods by date
+                // Group sleep periods by sleepDate
                 val dailySleepMap = sleepPeriods.groupBy { period ->
-                    val cal = Calendar.getInstance()
-                    cal.time = period.start
-                    if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_START_HOUR) { // If sleep started before 19 PM, count it for previous day
-                        cal.add(Calendar.DAY_OF_YEAR, -1)
-                    }
-                    cal.set(Calendar.HOUR_OF_DAY, 0)
-                    cal.set(Calendar.MINUTE, 0)
-                    cal.set(Calendar.SECOND, 0)
-                    cal.set(Calendar.MILLISECOND, 0)
-                    cal.time
+                    period.sleepDate
                 }
 
                 // Calculate sleep debt
@@ -104,23 +95,28 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 // Get the current date, adjusted for night logic
                 val currentDate = Calendar.getInstance()
                 val currentHour = currentDate.get(Calendar.HOUR_OF_DAY)
-                // Adjustment: we're still in the previous day -> calculate correctly because night counts as previous day
-                currentDate.add(Calendar.DAY_OF_YEAR, -1)
+
+                // Adjust current date based on whether midnight is between NIGHT_START_HOUR and NIGHT_END_HOUR
+                if (NIGHT_END_HOUR > NIGHT_START_HOUR) {
+                    // Midnight is NOT between NIGHT_START_HOUR and NIGHT_END_HOUR
+                    // Example: NIGHT_START_HOUR = 21, NIGHT_END_HOUR = 23
+                    // We should subtract a day if current hour is between these hours
+                    if (currentHour in NIGHT_START_HOUR..NIGHT_END_HOUR) {
+                        currentDate.add(Calendar.DAY_OF_YEAR, -1)
+                    }
+                } else {
+                    // Midnight IS between NIGHT_START_HOUR and NIGHT_END_HOUR
+                    // Example: NIGHT_START_HOUR = 19, NIGHT_END_HOUR = 6
+                    // We should subtract a day if we haven't reached NIGHT_END_HOUR yet
+                    if (currentHour < NIGHT_END_HOUR) {
+                        currentDate.add(Calendar.DAY_OF_YEAR, -1)
+                    }
+                }
                 
                 currentDate.set(Calendar.HOUR_OF_DAY, 0)
                 currentDate.set(Calendar.MINUTE, 0)
                 currentDate.set(Calendar.SECOND, 0)
                 currentDate.set(Calendar.MILLISECOND, 0)
-
-                // Determine if we should include the current night in calculations
-                val isNightOver = currentHour >= NIGHT_END_HOUR
-                val hasCurrentNightSleep = dailySleepMap[currentDate.time]?.isNotEmpty() == true
-                val shouldIncludeCurrentNight = hasCurrentNightSleep || isNightOver
-
-                // If we're not including current night, shift back one day
-                if (!shouldIncludeCurrentNight) {
-                    currentDate.add(Calendar.DAY_OF_YEAR, -1)
-                }
 
                 // Find the earliest date with sleep data
                 val earliestSleepDate = dailySleepMap.keys.minOrNull()

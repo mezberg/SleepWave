@@ -11,5 +11,6 @@ data class SleepPeriodEntity(
     val start: Date,
     val end: Date,
     val duration: Long,
-    val isPotentialSleep: Boolean
+    val isPotentialSleep: Boolean,
+    val sleepDate: Date // The date to which this sleep period belongs
 ) 

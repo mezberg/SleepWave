@@ -237,12 +237,42 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
         return screenOffPeriods
     }
 
+    private fun calculateSleepDate(start: Date, end: Date): Date {
+        val calendar = Calendar.getInstance()
+        
+        // Get hours for start and end
+        calendar.time = start
+        val startHour = calendar.get(Calendar.HOUR_OF_DAY)
+        
+        calendar.time = end
+        val endHour = calendar.get(Calendar.HOUR_OF_DAY)
+        
+        // Set calendar to end date and reset time part
+        calendar.time = end
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        
+        // Check if both start and end hours are between NIGHT_START_HOUR and midnight
+        if (startHour in NIGHT_START_HOUR..23 && endHour in NIGHT_START_HOUR..23) {
+            // Add one day to the end date
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        } else {
+            //else for proper working of the app
+        }
+        
+        return calendar.time
+    }
+
     private fun convertToEntity(screenOffPeriod: ScreenOffPeriod): SleepPeriodEntity {
+        val sleepDate = calculateSleepDate(screenOffPeriod.start, screenOffPeriod.end)
         return SleepPeriodEntity(
             start = screenOffPeriod.start,
             end = screenOffPeriod.end,
             duration = screenOffPeriod.duration,
-            isPotentialSleep = screenOffPeriod.isPotentialSleep
+            isPotentialSleep = screenOffPeriod.isPotentialSleep,
+            sleepDate = sleepDate
         )
     }
 
@@ -276,16 +306,7 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
                 _uiState.value = _uiState.value.copy(isLoading = true)
                 database.sleepPeriodDao().getAllSleepPeriods().collect { periods ->
                     val groupedPeriods = periods.groupBy { period ->
-                        val cal = Calendar.getInstance()
-                        cal.time = period.start
-                        if (cal.get(Calendar.HOUR_OF_DAY) < NIGHT_START_HOUR) {
-                            cal.add(Calendar.DAY_OF_YEAR, -1)
-                        }
-                        cal.set(Calendar.HOUR_OF_DAY, 0)
-                        cal.set(Calendar.MINUTE, 0)
-                        cal.set(Calendar.SECOND, 0)
-                        cal.set(Calendar.MILLISECOND, 0)
-                        cal.time
+                        period.sleepDate
                     }.map { (date, periodsForDate) ->
                         val dateFormat = SimpleDateFormat("MMM d", Locale.getDefault())
                         val nextDay = Calendar.getInstance().apply {
@@ -473,12 +494,14 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
             validationResult.fold(
                 onSuccess = { (finalStartDate, finalEndDate) ->
                     val duration = (finalEndDate.time - finalStartDate.time) / (1000 * 60) // Convert to minutes
+                    val sleepDate = calculateSleepDate(finalStartDate, finalEndDate)
 
                     val newPeriod = SleepPeriodEntity(
                         start = finalStartDate,
                         end = finalEndDate,
                         duration = duration,
-                        isPotentialSleep = true
+                        isPotentialSleep = true,
+                        sleepDate = sleepDate
                     )
 
                     database.sleepPeriodDao().insert(newPeriod)
