@@ -53,6 +53,8 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         private const val DAYS_TO_ANALYZE = 14L
         const val NIGHT_START_HOUR = 19 // 7 PM
         const val NIGHT_END_HOUR = 6 // 6 AM
+        const val HEALTHY_DEBT_HOURS = 1.0 // Healthy sleep debt threshold
+        const val DANGEROUS_DEBT_HOURS = 10.0 // Dangerous sleep debt threshold
     }
 
     init {

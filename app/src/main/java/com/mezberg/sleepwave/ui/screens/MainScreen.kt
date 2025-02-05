@@ -20,48 +20,124 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mezberg.sleepwave.R
 import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.MainScreenViewModel
 import java.text.DecimalFormat
 import kotlin.math.min
+import kotlin.math.cos
+import kotlin.math.sin
+import java.lang.Math
+
 
 @Composable
 fun SleepDebtCycle(
     sleepDebt: Float,
     maxSleepDebt: Float,
+    healthyDebtHours: Float = 1f,
+    dangerousDebtHours: Float = 10f,
     modifier: Modifier = Modifier
 ) {
+    val maxVisualizationDebt = 13f // Maximum visualization threshold for sleep debt
+    
     Canvas(
         modifier = modifier
-            .size(300.dp)
+            .size(240.dp)
             .padding(16.dp)
     ) {
         val canvasWidth = size.width
         val canvasHeight = size.height
-        val maxRadius = min(canvasWidth, canvasHeight) / 1.2f
+        val radius = min(canvasWidth, canvasHeight) / 2
         val center = Offset(canvasWidth / 2, canvasHeight / 2)
         val strokeWidth = 20f
-        val dotRadius = 5f
 
-        if (-sleepDebt <= 0) {
-            // Draw dot when sleep debt is negative or zero
-            drawCircle(
-                color = Color.Black,
-                radius = dotRadius,
-                center = center
-            )
-        } else {
-            // Draw circle with radius proportional to sleep debt
-            val radius = (-sleepDebt * maxRadius / 12f).coerceAtMost(maxRadius) // Scale factor of 12 hours
-            
-            drawCircle(
-                color = Color.Black,
-                radius = radius,
-                center = center,
+        // Draw base circle (green)
+        drawCircle(
+            color = Color(0xFF4CAF50),
+            radius = radius,
+            center = center,
+            style = Stroke(width = strokeWidth)
+        )
+
+        // Calculate sleep debt fill
+        val negativeSleepDebt = -sleepDebt
+        
+        if (negativeSleepDebt > 0) {
+            val fillRatio = (negativeSleepDebt / maxVisualizationDebt).coerceAtMost(1f)
+            val sweepAngle = fillRatio * 360f
+
+            drawArc(
+                color = Color(0xFFE57373),
+                startAngle = -90f,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2, radius * 2),
                 style = Stroke(width = strokeWidth)
             )
+        }
+
+        // Draw marks
+        val markLength = 10f
+        val textRadius = radius + strokeWidth / 2 + markLength + 20f
+
+        // Healthy debt mark
+        val healthyAngle = -90f + (healthyDebtHours / maxVisualizationDebt * 360f)
+        val healthyRadians = Math.toRadians(healthyAngle.toDouble())
+        val healthyMarkStart = Offset(
+            center.x + (radius - strokeWidth/2) * cos(healthyRadians).toFloat(),
+            center.y + (radius - strokeWidth/2) * sin(healthyRadians).toFloat()
+        )
+        val healthyMarkEnd = Offset(
+            center.x + (radius + strokeWidth/2 + markLength) * cos(healthyRadians).toFloat(),
+            center.y + (radius + strokeWidth/2 + markLength) * sin(healthyRadians).toFloat()
+        )
+        drawLine(
+            color = Color.Black,
+            start = healthyMarkStart,
+            end = healthyMarkEnd,
+            strokeWidth = 2f
+        )
+
+        // Dangerous mark
+        val dangerousAngle = -90f + (dangerousDebtHours / maxVisualizationDebt * 360f)
+        val dangerousRadians = Math.toRadians(dangerousAngle.toDouble())
+        val dangerousMarkStart = Offset(
+            center.x + (radius - strokeWidth/2) * cos(dangerousRadians).toFloat(),
+            center.y + (radius - strokeWidth/2) * sin(dangerousRadians).toFloat()
+        )
+        val dangerousMarkEnd = Offset(
+            center.x + (radius + strokeWidth/2 + markLength) * cos(dangerousRadians).toFloat(),
+            center.y + (radius + strokeWidth/2 + markLength) * sin(dangerousRadians).toFloat()
+        )
+        drawLine(
+            color = Color.Black,
+            start = dangerousMarkStart,
+            end = dangerousMarkEnd,
+            strokeWidth = 2f
+        )
+
+        // Draw text labels
+        drawIntoCanvas { canvas ->
+            val textPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                textSize = 30f
+                textAlign = android.graphics.Paint.Align.CENTER
+                isFakeBoldText = true
+            }
+
+            // Healthy debt label
+            val healthyTextX = center.x + textRadius * cos(healthyRadians).toFloat() + 50f
+            val healthyTextY = center.y + textRadius * sin(healthyRadians).toFloat() - 20f
+            canvas.nativeCanvas.drawText("${healthyDebtHours.toInt()}h healthy sleep debt (?)", healthyTextX, healthyTextY, textPaint)
+
+            // Dangerous debt label
+            val dangerousTextX = center.x + textRadius * cos(dangerousRadians).toFloat()
+            val dangerousTextY = center.y + textRadius * sin(dangerousRadians).toFloat() - 20f
+            canvas.nativeCanvas.drawText("${dangerousDebtHours.toInt()}h dangerous for health (?)", dangerousTextX, dangerousTextY, textPaint)
         }
     }
 }
@@ -122,6 +198,8 @@ fun MainScreen(
                 SleepDebtCycle(
                     sleepDebt = sleepDebtInfo.sleepDebt.toFloat(),
                     maxSleepDebt = uiState.maxSleepDebt.toFloat(),
+                    healthyDebtHours = MainScreenViewModel.HEALTHY_DEBT_HOURS.toFloat(),
+                    dangerousDebtHours = MainScreenViewModel.DANGEROUS_DEBT_HOURS.toFloat(),
                     modifier = Modifier.padding(vertical = 24.dp)
                 )
 

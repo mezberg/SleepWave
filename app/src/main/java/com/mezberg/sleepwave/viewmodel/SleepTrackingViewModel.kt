@@ -309,11 +309,11 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
                         period.sleepDate
                     }.map { (date, periodsForDate) ->
                         val dateFormat = SimpleDateFormat("MMM d", Locale.getDefault())
-                        val nextDay = Calendar.getInstance().apply {
+                        val previousDay = Calendar.getInstance().apply {
                             time = date
-                            add(Calendar.DAY_OF_YEAR, 1)
+                            add(Calendar.DAY_OF_YEAR, -1)
                         }
-                        val displayDate = "${dateFormat.format(date)} - ${dateFormat.format(nextDay.time)}"
+                        val displayDate = "${dateFormat.format(previousDay.time)} - ${dateFormat.format(date)}"
                         
                         val totalMinutes = periodsForDate.sumOf { it.duration }
                         SleepPeriodDisplayData(
