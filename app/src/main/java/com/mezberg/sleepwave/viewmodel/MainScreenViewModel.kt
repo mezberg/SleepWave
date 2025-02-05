@@ -15,6 +15,7 @@ import java.util.Locale
 import kotlin.math.exp
 import android.util.Log
 import java.text.DecimalFormat
+import com.mezberg.sleepwave.data.SleepPreferencesManager
 
 data class SleepDebtInfo(
     val sleepDebt: Double,
@@ -36,11 +37,13 @@ data class DailySleepInfo(
 data class MainScreenUiState(
     val sleepDebtInfo: SleepDebtInfo? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val maxSleepDebt: Double = 0.0
 )
 
 class MainScreenViewModel(application: Application) : AndroidViewModel(application) {
     private val database = SleepDatabase.getDatabase(application)
+    private val preferencesManager = SleepPreferencesManager(application)
     private val _uiState = MutableStateFlow(MainScreenUiState())
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
@@ -54,6 +57,12 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         calculateSleepDebt()
+        // Collect max sleep debt changes
+        viewModelScope.launch {
+            preferencesManager.maxSleepDebt.collect { maxDebt ->
+                _uiState.value = _uiState.value.copy(maxSleepDebt = maxDebt)
+            }
+        }
         // Recalculate after a delay to ensure new sleep data is captured
         viewModelScope.launch {
             kotlinx.coroutines.delay(800) // Wait for 800ms
@@ -165,11 +174,19 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                     )
                 }
 
+                val sleepDebtInfo = SleepDebtInfo(
+                    sleepDebt = totalSleepDebt,
+                    dailySleepData = dailySleepInfo
+                )
+
+                // Update max sleep debt if current debt is higher (remember sleep debt is negative)
+                if (-totalSleepDebt > _uiState.value.maxSleepDebt) {
+                    preferencesManager.updateMaxSleepDebt(-totalSleepDebt)
+                    Log.d("MainScreenViewModel", "Updated max sleep debt: $totalSleepDebt")
+                }
+
                 _uiState.value = _uiState.value.copy(
-                    sleepDebtInfo = SleepDebtInfo(
-                        sleepDebt = totalSleepDebt,
-                        dailySleepData = dailySleepInfo
-                    ),
+                    sleepDebtInfo = sleepDebtInfo,
                     isLoading = false
                 )
             } catch (e: Exception) {

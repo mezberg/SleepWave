@@ -1,5 +1,6 @@
 package com.mezberg.sleepwave.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +11,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -20,6 +25,51 @@ import com.mezberg.sleepwave.R
 import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.MainScreenViewModel
 import java.text.DecimalFormat
+import kotlin.math.min
+
+@Composable
+fun SleepDebtCycle(
+    sleepDebt: Float,
+    maxSleepDebt: Float,
+    modifier: Modifier = Modifier
+) {
+    Canvas(
+        modifier = modifier
+            .size(200.dp)
+            .padding(16.dp)
+    ) {
+        val canvasWidth = size.width
+        val canvasHeight = size.height
+        val radius = min(canvasWidth, canvasHeight) / 2
+        val center = Offset(canvasWidth / 2, canvasHeight / 2)
+        val strokeWidth = 20f
+
+        // Draw background circle (empty)
+        drawCircle(
+            color = Color.LightGray.copy(alpha = 0.3f),
+            radius = radius,
+            center = center,
+            style = Stroke(width = strokeWidth)
+        )
+
+        // Draw filled circle based on sleep debt (remember sleep debt is negative)
+        val sweepAngle = if (-sleepDebt > 0 && maxSleepDebt > 0) {
+            (sleepDebt / maxSleepDebt) * 360f
+        } else {
+            0f
+        }
+
+        drawArc(
+            color = Color.Black,
+            startAngle = -90f,
+            sweepAngle = -sweepAngle,
+            useCenter = false,
+            topLeft = Offset(center.x - radius, center.y - radius),
+            size = Size(radius * 2, radius * 2),
+            style = Stroke(width = strokeWidth)
+        )
+    }
+}
 
 @Composable
 fun MainScreen(
@@ -72,6 +122,12 @@ fun MainScreen(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 24.dp)
+                )
+
+                SleepDebtCycle(
+                    sleepDebt = sleepDebtInfo.sleepDebt.toFloat(),
+                    maxSleepDebt = uiState.maxSleepDebt.toFloat(),
+                    modifier = Modifier.padding(vertical = 24.dp)
                 )
 
                 Text(
