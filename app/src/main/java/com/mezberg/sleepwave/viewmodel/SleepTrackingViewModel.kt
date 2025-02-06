@@ -11,9 +11,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mezberg.sleepwave.data.SleepDatabase
 import com.mezberg.sleepwave.data.SleepPeriodEntity
+import com.mezberg.sleepwave.data.SleepPreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -43,18 +45,33 @@ data class SleepTrackingUiState(
     val sleepPeriods: List<SleepPeriodDisplayData> = emptyList(),
     val hasPermission: Boolean = false,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val nightStartHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_START_HOUR,
+    val nightEndHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_END_HOUR
 )
 
 class SleepTrackingViewModel(application: Application) : AndroidViewModel(application) {
     private val database = SleepDatabase.getDatabase(application)
+    private val preferencesManager = SleepPreferencesManager(application)
     private val _uiState = MutableStateFlow(SleepTrackingUiState())
     val uiState: StateFlow<SleepTrackingUiState> = _uiState.asStateFlow()
 
     companion object {
-        const val NIGHT_START_HOUR = 19 // 7 PM
-        const val NIGHT_END_HOUR = 6 // 6 AM
         private const val DEFAULT_DAYS_TO_FETCH = 14L
+
+        /**
+         * Checks if a given hour is within the night period.
+         * Handles cases where night period may or may not cross midnight.
+         */
+        private fun isNightHour(hour: Int, nightStartHour: Int, nightEndHour: Int): Boolean {
+            return if (nightStartHour > nightEndHour) {
+                // Night period crosses midnight (e.g., 22:00 to 06:00)
+                hour >= nightStartHour || hour < nightEndHour
+            } else {
+                // Night period within same day (e.g., 02:00 to 10:00)
+                hour >= nightStartHour && hour < nightEndHour
+            }
+        }
     }
 
     // Flag to prevent simultaneous execution of analyzeSleepData
@@ -63,6 +80,17 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
     // Initialize the ViewModel by checking permissions and loading data
     init {
         checkPermissionAndLoadData()
+        // Collect night hours changes
+        viewModelScope.launch {
+            preferencesManager.nightStartHour.collect { startHour ->
+                _uiState.value = _uiState.value.copy(nightStartHour = startHour)
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.nightEndHour.collect { endHour ->
+                _uiState.value = _uiState.value.copy(nightEndHour = endHour)
+            }
+        }
     }
 
     private fun checkPermissionAndLoadData() {
@@ -131,13 +159,18 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
         return screenOffPeriods
     }
 
-    private fun markSleepPeriods(screenOffPeriods: List<ScreenOffPeriod>) {
+    private suspend fun markSleepPeriods(screenOffPeriods: List<ScreenOffPeriod>) {
         val calendar = Calendar.getInstance()
+        // Get night hours directly from preferences manager to ensure latest values
+        val nightStartHour = preferencesManager.nightStartHour.first()
+        val nightEndHour = preferencesManager.nightEndHour.first()
+        
         for (period in screenOffPeriods) {
             calendar.time = period.start
             val hour = calendar.get(Calendar.HOUR_OF_DAY)
-            if ((hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR) && period.duration >= 90) {
+            if (isNightHour(hour, nightStartHour, nightEndHour) && period.duration >= 90) {
                 period.isPotentialSleep = true
+                Log.d("SleepTrackingViewModel", "Marked sleep period: $period")
             }
         }
     }
@@ -146,40 +179,41 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
         return screenOffPeriods.filter { it.isPotentialSleep }
     }
 
-    private fun deleteFalseSleeps(screenOffPeriods: List<ScreenOffPeriod>): List<ScreenOffPeriod> {
-        val sleepPeriods = screenOffPeriods.filter { it.isPotentialSleep }.sortedBy { it.start }
+    private suspend fun deleteFalseSleeps(screenOffPeriods: List<ScreenOffPeriod>): List<ScreenOffPeriod> {
+        val sleepPeriods = screenOffPeriods.filter { it.isPotentialSleep }
         val periodsToRemove = mutableSetOf<ScreenOffPeriod>()
 
-        fun areSameNight(date1: Date, date2: Date): Boolean {
-            val cal1 = Calendar.getInstance().apply { time = date1 }
-            val cal2 = Calendar.getInstance().apply { time = date2 }
-            
-            if (cal1.get(Calendar.HOUR_OF_DAY) >= NIGHT_START_HOUR && cal2.get(Calendar.HOUR_OF_DAY) < NIGHT_END_HOUR) {
-                cal2.add(Calendar.DAY_OF_YEAR, -1)
-            }
-            
-            return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                   cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+        // Group periods by their sleep date
+        val periodsByDate = sleepPeriods.groupBy { period ->
+            calculateSleepDate(period.start, period.end)
         }
 
-        for (i in 0 until sleepPeriods.size - 1) {
-            val currentPeriod = sleepPeriods[i]
-            val nextPeriod = sleepPeriods[i + 1]
-            
-            if (areSameNight(currentPeriod.start, nextPeriod.start)) {
-                val timeBetween = TimeUnit.MILLISECONDS.toMinutes(
-                    nextPeriod.start.time - currentPeriod.end.time
-                )
+        // Process each group of periods that belong to the same sleep date
+        periodsByDate.values.forEach { sameDatePeriods ->
+            if (sameDatePeriods.size > 1) {
+                // Sort periods by start time
+                val sortedPeriods = sameDatePeriods.sortedBy { it.start }
                 
-                if (timeBetween > 15) {
-                    val shorterPeriod = if (currentPeriod.duration < nextPeriod.duration) {
-                        currentPeriod
-                    } else {
-                        nextPeriod
-                    }
+                // Check consecutive periods
+                for (i in 0 until sortedPeriods.size - 1) {
+                    val currentPeriod = sortedPeriods[i]
+                    val nextPeriod = sortedPeriods[i + 1]
                     
-                    if (shorterPeriod.duration < 180) {
-                        periodsToRemove.add(shorterPeriod)
+                    val timeBetween = TimeUnit.MILLISECONDS.toMinutes(
+                        nextPeriod.start.time - currentPeriod.end.time
+                    )
+                    
+                    if (timeBetween > 15) {
+                        val shorterPeriod = if (currentPeriod.duration < nextPeriod.duration) {
+                            currentPeriod
+                        } else {
+                            nextPeriod
+                        }
+                        
+                        if (shorterPeriod.duration < 180) {
+                            periodsToRemove.add(shorterPeriod)
+                            Log.d("SleepTrackingViewModel", "Removed shorter period: $shorterPeriod")
+                        }
                     }
                 }
             }
@@ -201,7 +235,7 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
         fun isOutsideNightPeriod(date: Date): Boolean {
             calendar.time = date
             val hour = calendar.get(Calendar.HOUR_OF_DAY)
-            return hour in NIGHT_END_HOUR until NIGHT_START_HOUR
+            return !isNightHour(hour, _uiState.value.nightStartHour, _uiState.value.nightEndHour)
         }
         
         do {
@@ -237,8 +271,19 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
         return screenOffPeriods
     }
 
-    private fun calculateSleepDate(start: Date, end: Date): Date {
+    private fun isOutsideNightPeriod(date: Date): Boolean {
         val calendar = Calendar.getInstance()
+        calendar.time = date
+        val hour = calendar.get(Calendar.HOUR_OF_DAY)
+        // Use UI state values since this is called from a non-suspend context
+        return !isNightHour(hour, _uiState.value.nightStartHour, _uiState.value.nightEndHour)
+    }
+
+    private suspend fun calculateSleepDate(start: Date, end: Date): Date {
+        val calendar = Calendar.getInstance()
+        // Get night hours directly from preferences manager to ensure latest values
+        val nightStartHour = preferencesManager.nightStartHour.first()
+        val nightEndHour = preferencesManager.nightEndHour.first()
         
         // Get hours for start and end
         calendar.time = start
@@ -254,18 +299,19 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
         
-        // Check if both start and end hours are between NIGHT_START_HOUR and midnight
-        if (startHour in NIGHT_START_HOUR..23 && endHour in NIGHT_START_HOUR..23) {
-            // Add one day to the end date
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
-        } else {
-            //else for proper working of the app
+        // If night period crosses midnight (e.g., 21:00-06:00)
+        if (nightStartHour > nightEndHour) {
+            // If sleep started between NIGHT_START_HOUR and midnight
+            if (startHour >= nightStartHour && endHour <= 23) {
+                // Add one day to the end date since this sleep belongs to the next day's period
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+            }
         }
         
         return calendar.time
     }
 
-    private fun convertToEntity(screenOffPeriod: ScreenOffPeriod): SleepPeriodEntity {
+    private suspend fun convertToEntity(screenOffPeriod: ScreenOffPeriod): SleepPeriodEntity {
         val sleepDate = calculateSleepDate(screenOffPeriod.start, screenOffPeriod.end)
         return SleepPeriodEntity(
             start = screenOffPeriod.start,

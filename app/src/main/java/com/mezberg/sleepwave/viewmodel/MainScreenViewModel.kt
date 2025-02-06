@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mezberg.sleepwave.data.SleepDatabase
+import com.mezberg.sleepwave.data.SleepPreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +16,6 @@ import java.util.Locale
 import kotlin.math.exp
 import android.util.Log
 import java.text.DecimalFormat
-import com.mezberg.sleepwave.data.SleepPreferencesManager
 
 data class SleepDebtInfo(
     val sleepDebt: Double,
@@ -38,7 +38,10 @@ data class MainScreenUiState(
     val sleepDebtInfo: SleepDebtInfo? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val maxSleepDebt: Double = 0.0
+    val maxSleepDebt: Double = 0.0,
+    val nightStartHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_START_HOUR,
+    val nightEndHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_END_HOUR,
+    val neededSleepHours: Double = SleepPreferencesManager.DEFAULT_NEEDED_SLEEP_HOURS
 )
 
 class MainScreenViewModel(application: Application) : AndroidViewModel(application) {
@@ -48,21 +51,32 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
     companion object {
-        private const val NEEDED_SLEEP_HOURS = 8.0 // Recommended sleep hours per night
         private const val TAU = 4.0 // Time constant in days
         private const val DAYS_TO_ANALYZE = 14L
-        const val NIGHT_START_HOUR = 19 // 7 PM
-        const val NIGHT_END_HOUR = 6 // 6 AM
-        const val HEALTHY_DEBT_HOURS = 1.0 // Healthy sleep debt threshold
-        const val DANGEROUS_DEBT_HOURS = 10.0 // Dangerous sleep debt threshold
     }
 
     init {
         calculateSleepDebt()
-        // Collect max sleep debt changes
+        // Collect preferences changes
         viewModelScope.launch {
             preferencesManager.maxSleepDebt.collect { maxDebt ->
                 _uiState.value = _uiState.value.copy(maxSleepDebt = maxDebt)
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.nightStartHour.collect { startHour ->
+                _uiState.value = _uiState.value.copy(nightStartHour = startHour)
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.nightEndHour.collect { endHour ->
+                _uiState.value = _uiState.value.copy(nightEndHour = endHour)
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.neededSleepHours.collect { hours ->
+                _uiState.value = _uiState.value.copy(neededSleepHours = hours)
+                calculateSleepDebt() // Recalculate when needed sleep hours change
             }
         }
         // Recalculate after a delay to ensure new sleep data is captured
@@ -82,9 +96,43 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true)
 
-                // Get all sleep periods
-                val endDate = Calendar.getInstance()
+                // Get current time and check if we're still in night period
+                val currentDate = Calendar.getInstance()
+                val currentHour = currentDate.get(Calendar.HOUR_OF_DAY)
+                val nightStartHour = _uiState.value.nightStartHour
+                val nightEndHour = _uiState.value.nightEndHour
+                
+                // Determine if we should skip the current night
+                val isInNightPeriod = if (nightStartHour > nightEndHour) {
+                    // Night crosses midnight (e.g., 19:00-06:00)
+                    // We're in night period if:
+                    // - It's after night start (e.g., 20:00)
+                    // - Or before night end (e.g., 05:00)
+                    currentHour >= nightStartHour || currentHour < nightEndHour
+                } else {
+                    // Night is within same day (e.g., 02:00-10:00)
+                    currentHour <= nightEndHour
+                }
+
+                // Set end date to previous day if we're in night period
+                val endDate = Calendar.getInstance().apply {
+                    if (isInNightPeriod) {
+                        add(Calendar.DAY_OF_YEAR, -1)
+                    }
+                    // Set time to end of day to include all sleep periods
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+                
                 val startDate = Calendar.getInstance().apply {
+                    timeInMillis = endDate.timeInMillis
+                    // Reset to start of the day for proper day calculation
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
                     add(Calendar.DAY_OF_YEAR, -DAYS_TO_ANALYZE.toInt())
                 }
 
@@ -93,41 +141,13 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                     endDate.time
                 )
 
-                // Group sleep periods by sleepDate
-                val dailySleepMap = sleepPeriods.groupBy { period ->
-                    period.sleepDate
-                }
-
-                // Calculate sleep debt
+                // Calculate sleep debt using sleepDate from DB
                 var totalSleepDebt = 0.0
                 val dailySleepInfo = mutableListOf<DailySleepInfo>()
                 val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
-                
-                // Get the current date, adjusted for night logic
-                val currentDate = Calendar.getInstance()
-                val currentHour = currentDate.get(Calendar.HOUR_OF_DAY)
 
-                // Adjust current date based on whether midnight is between NIGHT_START_HOUR and NIGHT_END_HOUR
-                if (NIGHT_END_HOUR > NIGHT_START_HOUR) {
-                    // Midnight is NOT between NIGHT_START_HOUR and NIGHT_END_HOUR
-                    // Example: NIGHT_START_HOUR = 21, NIGHT_END_HOUR = 23
-                    // We should subtract a day if current hour is between these hours
-                    if (currentHour in NIGHT_START_HOUR..NIGHT_END_HOUR) {
-                        currentDate.add(Calendar.DAY_OF_YEAR, -1)
-                    }
-                } else {
-                    // Midnight IS between NIGHT_START_HOUR and NIGHT_END_HOUR
-                    // Example: NIGHT_START_HOUR = 19, NIGHT_END_HOUR = 6
-                    // We should subtract a day if we haven't reached NIGHT_END_HOUR yet
-                    if (currentHour < NIGHT_END_HOUR) {
-                        currentDate.add(Calendar.DAY_OF_YEAR, -1)
-                    }
-                }
-                
-                currentDate.set(Calendar.HOUR_OF_DAY, 0)
-                currentDate.set(Calendar.MINUTE, 0)
-                currentDate.set(Calendar.SECOND, 0)
-                currentDate.set(Calendar.MILLISECOND, 0)
+                // Group sleep periods by sleepDate (already calculated in DB)
+                val dailySleepMap = sleepPeriods.groupBy { it.sleepDate }
 
                 // Find the earliest date with sleep data
                 val earliestSleepDate = dailySleepMap.keys.minOrNull()
@@ -140,13 +160,17 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 }
 
                 // Calculate how many days to analyze based on available data
-                val daysToAnalyze = ((currentDate.timeInMillis - earliestSleepDate.time) / (24 * 60 * 60 * 1000)).toInt()
+                val daysToAnalyze = ((endDate.timeInMillis - earliestSleepDate.time) / (24 * 60 * 60 * 1000)).toInt()
                 val daysToUse = minOf(daysToAnalyze + 1, DAYS_TO_ANALYZE.toInt())
 
                 for (i in 0 until daysToUse) {
                     val cal = Calendar.getInstance()
-                    cal.timeInMillis = currentDate.timeInMillis  // Start from adjusted current date
+                    cal.timeInMillis = endDate.timeInMillis
                     cal.add(Calendar.DAY_OF_YEAR, -i)
+                    cal.set(Calendar.HOUR_OF_DAY, 0)
+                    cal.set(Calendar.MINUTE, 0)
+                    cal.set(Calendar.SECOND, 0)
+                    cal.set(Calendar.MILLISECOND, 0)
                     
                     val date = cal.time
                     // Skip if this date is before our earliest sleep data
@@ -155,15 +179,15 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                     }
 
                     val sleepPeriodsForDay = dailySleepMap[date] ?: emptyList()
-                    Log.d("MainScreenViewModel", "Sleep periods for day: $sleepPeriodsForDay")
+                    //Log.d("MainScreenViewModel", "Sleep periods for day: $sleepPeriodsForDay")
                     val totalSleepHours = sleepPeriodsForDay.sumOf { it.duration } / 60.0 // Convert minutes to hours
-                    Log.d("MainScreenViewModel", "Total sleep hours: $totalSleepHours")
-                    val sleepDeficit = totalSleepHours - NEEDED_SLEEP_HOURS
-                    Log.d("MainScreenViewModel", "Sleep deficit: $sleepDeficit")
+                    //Log.d("MainScreenViewModel", "Total sleep hours: $totalSleepHours")
+                    val sleepDeficit = totalSleepHours - _uiState.value.neededSleepHours
+                    //Log.d("MainScreenViewModel", "Sleep deficit: $sleepDeficit")
                     val daysAgo = i
-                    Log.d("MainScreenViewModel", "Days ago: $daysAgo")
+                    //Log.d("MainScreenViewModel", "Days ago: $daysAgo")
                     val debtContribution = sleepDeficit * exp(-daysAgo / TAU)
-                    Log.d("MainScreenViewModel", "Debt contribution: $debtContribution")
+                    //Log.d("MainScreenViewModel", "Debt contribution: $debtContribution")
                     totalSleepDebt += debtContribution
                     Log.d("MainScreenViewModel", "Total sleep debt: $totalSleepDebt")
 
@@ -184,7 +208,6 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 // Update max sleep debt if current debt is higher (remember sleep debt is negative)
                 if (-totalSleepDebt > _uiState.value.maxSleepDebt) {
                     preferencesManager.updateMaxSleepDebt(-totalSleepDebt)
-                    Log.d("MainScreenViewModel", "Updated max sleep debt: $totalSleepDebt")
                 }
 
                 _uiState.value = _uiState.value.copy(
