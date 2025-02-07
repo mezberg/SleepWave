@@ -23,6 +23,9 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import com.mezberg.sleepwave.utils.PermissionUtils
+import com.mezberg.sleepwave.MainActivity
+import com.mezberg.sleepwave.data.WeeklySleepData
+import com.mezberg.sleepwave.ui.components.DailySleepData
 
 // Data class representing a period when the screen is off
 data class ScreenOffPeriod(
@@ -43,6 +46,34 @@ data class SleepPeriodDisplayData(
 // Data class representing the UI state for sleep tracking
 data class SleepTrackingUiState(
     val sleepPeriods: List<SleepPeriodDisplayData> = emptyList(),
+    val weeklySleepData: List<DailySleepData> = emptyList(),
+    val weekStartDate: Date = Calendar.getInstance().apply {
+        // Roll back to the most recent Monday
+        val currentDayOfWeek = get(Calendar.DAY_OF_WEEK)
+        // Calendar.MONDAY is 2, so we need to adjust our calculation
+        val daysToSubtract = when (currentDayOfWeek) {
+            Calendar.SUNDAY -> 6
+            else -> currentDayOfWeek - 2
+        }
+        add(Calendar.DAY_OF_YEAR, -daysToSubtract)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.time,
+    val weekEndDate: Date = Calendar.getInstance().apply {
+        // Roll back to Monday and add 6 days to get to Sunday
+        val currentDayOfWeek = get(Calendar.DAY_OF_WEEK)
+        val daysToSubtract = when (currentDayOfWeek) {
+            Calendar.SUNDAY -> 6
+            else -> currentDayOfWeek - 2
+        }
+        add(Calendar.DAY_OF_YEAR, -daysToSubtract + 6) // Add 6 to get to Sunday
+        set(Calendar.HOUR_OF_DAY, 23)
+        set(Calendar.MINUTE, 59)
+        set(Calendar.SECOND, 59)
+        set(Calendar.MILLISECOND, 999)
+    }.time,
     val hasPermission: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -91,6 +122,20 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
                 _uiState.value = _uiState.value.copy(nightEndHour = endHour)
             }
         }
+
+        // Listen for app foreground events
+        viewModelScope.launch {
+            MainActivity.appForegroundFlow.collect {
+                if (_uiState.value.hasPermission) {
+                    analyzeSleepData()
+                }
+            }
+        }
+
+        // Collect weekly sleep data
+        viewModelScope.launch {
+            collectWeeklySleepData()
+        }
     }
 
     private fun checkPermissionAndLoadData() {
@@ -104,8 +149,8 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
     // Fetch the latest sleep period from the database
     private suspend fun checkLatestSleep(): Date? {
         return try {
-            val latestSleep = database.sleepPeriodDao().getLatestSleepPeriod()
-            Log.d("SleepTrackingViewModel", "Latest sleep: ${latestSleep?.end}")
+            val latestSleep = database.sleepPeriodDao().getLatestSleepPeriodIncludingDeleted()
+            Log.d("SleepTrackingViewModel", "Latest sleep (including deleted): ${latestSleep?.end}")
             latestSleep?.end
         } catch (e: Exception) {
             Log.d("SleepTrackingViewModel", "Error getting latest sleep: ${e.message}")
@@ -446,7 +491,7 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
     fun deleteSleepPeriod(sleepPeriod: SleepPeriodEntity) {
         viewModelScope.launch {
             try {
-                database.sleepPeriodDao().delete(sleepPeriod)
+                database.sleepPeriodDao().markAsDeleted(sleepPeriod.id)
                 loadSleepPeriods() // Refresh the UI after deletion
                 kotlinx.coroutines.delay(100) // Small delay to ensure deletion is complete
             } catch (e: Exception) {
@@ -560,6 +605,82 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
             )
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    fun navigateToNextWeek() {
+        val calendar = Calendar.getInstance()
+        
+        // Update start date
+        calendar.time = _uiState.value.weekStartDate
+        calendar.add(Calendar.DAY_OF_YEAR, 7)
+        val newStartDate = calendar.time
+
+        // Update end date
+        calendar.time = _uiState.value.weekEndDate
+        calendar.add(Calendar.DAY_OF_YEAR, 7)
+        val newEndDate = calendar.time
+
+        _uiState.value = _uiState.value.copy(
+            weekStartDate = newStartDate,
+            weekEndDate = newEndDate
+        )
+
+        viewModelScope.launch {
+            collectWeeklySleepData()
+        }
+    }
+
+    fun navigateToPreviousWeek() {
+        val calendar = Calendar.getInstance()
+        
+        // Update start date
+        calendar.time = _uiState.value.weekStartDate
+        calendar.add(Calendar.DAY_OF_YEAR, -7)
+        val newStartDate = calendar.time
+
+        // Update end date
+        calendar.time = _uiState.value.weekEndDate
+        calendar.add(Calendar.DAY_OF_YEAR, -7)
+        val newEndDate = calendar.time
+
+        _uiState.value = _uiState.value.copy(
+            weekStartDate = newStartDate,
+            weekEndDate = newEndDate
+        )
+
+        viewModelScope.launch {
+            collectWeeklySleepData()
+        }
+    }
+
+    private suspend fun collectWeeklySleepData() {
+        try {
+            database.sleepPeriodDao().getWeeklySleepData(
+                _uiState.value.weekStartDate,
+                _uiState.value.weekEndDate
+            ).collect { weeklyData ->
+                // Create a map of dates to sleep hours
+                val sleepMap = weeklyData.associate { it.date to it.totalSleepHours }
+                
+                // Create a list for all days of the week
+                val calendar = Calendar.getInstance()
+                calendar.time = _uiState.value.weekStartDate
+                
+                val dailyData = (0..6).map { dayOffset ->
+                    calendar.time = _uiState.value.weekStartDate
+                    calendar.add(Calendar.DAY_OF_YEAR, dayOffset)
+                    val date = calendar.time
+                    DailySleepData(
+                        date = date,
+                        totalSleepHours = sleepMap[date] ?: 0f
+                    )
+                }
+                
+                _uiState.value = _uiState.value.copy(weeklySleepData = dailyData)
+            }
+        } catch (e: Exception) {
+            Log.e("SleepTrackingViewModel", "Error collecting weekly sleep data: ${e.message}")
         }
     }
 } 

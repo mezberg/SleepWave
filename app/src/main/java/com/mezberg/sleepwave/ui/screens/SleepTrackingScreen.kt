@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -25,6 +26,8 @@ import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.SleepPeriodDisplayData
 import com.mezberg.sleepwave.viewmodel.SleepTrackingUiState
 import com.mezberg.sleepwave.viewmodel.SleepTrackingViewModel
+import com.mezberg.sleepwave.ui.components.WeeklySleepGraph
+import com.mezberg.sleepwave.ui.components.WeekNavigationHeader
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.MainScope
@@ -44,8 +47,12 @@ fun SleepTrackingScreen(
     onPermissionRequest: () -> Unit,
     onDeleteSleepPeriod: (SleepPeriodEntity) -> Unit,
     onAddSleepPeriod: suspend (Date, String, Date, String) -> Result<Unit>,
+    onPreviousWeek: () -> Unit,
+    onNextWeek: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isEditMode by remember { mutableStateOf(false) }
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -56,13 +63,46 @@ fun SleepTrackingScreen(
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = stringResource(R.string.sleep_tracking),
-                style = MaterialTheme.typography.headlineLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(vertical = 24.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isEditMode) {
+                    IconButton(
+                        onClick = { isEditMode = false }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back to graphs"
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.size(48.dp)) // To maintain layout balance
+                }
+
+                Text(
+                    text = stringResource(R.string.sleep_tracking),
+                    style = MaterialTheme.typography.headlineLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                if (!isEditMode) {
+                    FilledTonalIconButton(
+                        onClick = { isEditMode = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit sleep periods"
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.size(48.dp)) // To maintain layout balance
+                }
+            }
 
             if (!uiState.hasPermission) {
                 Button(
@@ -89,12 +129,35 @@ fun SleepTrackingScreen(
             }
 
             if (!uiState.isLoading && uiState.error == null) {
-                SleepPeriodsList(
-                    sleepPeriods = uiState.sleepPeriods,
-                    onDeleteSleepPeriod = onDeleteSleepPeriod,
-                    onAddSleepPeriod = onAddSleepPeriod,
-                    modifier = Modifier.weight(1f)
-                )
+                if (isEditMode) {
+                    SleepPeriodsList(
+                        sleepPeriods = uiState.sleepPeriods,
+                        onDeleteSleepPeriod = onDeleteSleepPeriod,
+                        onAddSleepPeriod = onAddSleepPeriod,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        WeekNavigationHeader(
+                            startDate = uiState.weekStartDate,
+                            endDate = uiState.weekEndDate,
+                            onPreviousWeek = onPreviousWeek,
+                            onNextWeek = onNextWeek
+                        )
+                        
+                        WeeklySleepGraph(
+                            sleepData = uiState.weeklySleepData,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -495,7 +558,9 @@ fun SleepTrackingScreenPreview() {
             ),
             onPermissionRequest = {},
             onDeleteSleepPeriod = {},
-            onAddSleepPeriod = { _, _, _, _ -> Result.success(Unit) }
+            onAddSleepPeriod = { _, _, _, _ -> Result.success(Unit) },
+            onPreviousWeek = {},
+            onNextWeek = {}
         )
     }
 } 

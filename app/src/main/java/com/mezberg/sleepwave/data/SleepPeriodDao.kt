@@ -6,28 +6,34 @@ import java.util.*
 
 @Dao
 interface SleepPeriodDao {
-    @Query("SELECT * FROM sleep_periods ORDER BY start DESC")
+    @Query("SELECT * FROM sleep_periods WHERE isDeleted = 0 ORDER BY start DESC")
     fun getAllSleepPeriods(): Flow<List<SleepPeriodEntity>>
 
-    @Query("SELECT * FROM sleep_periods WHERE id = :id")
+    @Query("SELECT * FROM sleep_periods WHERE id = :id AND isDeleted = 0")
     suspend fun getSleepPeriodById(id: Long): SleepPeriodEntity?
 
     @Query("SELECT * FROM sleep_periods ORDER BY end DESC LIMIT 1")
+    suspend fun getLatestSleepPeriodIncludingDeleted(): SleepPeriodEntity?
+
+    @Query("SELECT * FROM sleep_periods WHERE isDeleted = 0 ORDER BY end DESC LIMIT 1")
     suspend fun getLatestSleepPeriod(): SleepPeriodEntity?
 
-    @Query("SELECT EXISTS(SELECT 1 FROM sleep_periods WHERE start = :start AND end = :end)")
+    @Query("SELECT EXISTS(SELECT 1 FROM sleep_periods WHERE start = :start AND end = :end AND isDeleted = 0)")
     suspend fun doesSleepPeriodExist(start: Date, end: Date): Boolean
 
-    @Query("SELECT * FROM sleep_periods WHERE start BETWEEN :startDate AND :endDate ORDER BY start DESC")
+    @Query("SELECT * FROM sleep_periods WHERE start BETWEEN :startDate AND :endDate AND isDeleted = 0 ORDER BY start DESC")
     suspend fun getSleepPeriodsBetweenDates(startDate: Date, endDate: Date): List<SleepPeriodEntity>
 
     @Query("""
         SELECT EXISTS(
             SELECT 1 FROM sleep_periods 
-            WHERE (start BETWEEN :newStart AND :newEnd) 
-            OR (end BETWEEN :newStart AND :newEnd)
-            OR (:newStart BETWEEN start AND end)
-            OR (:newEnd BETWEEN start AND end)
+            WHERE isDeleted = 0
+            AND (
+                (start BETWEEN :newStart AND :newEnd) 
+                OR (end BETWEEN :newStart AND :newEnd)
+                OR (:newStart BETWEEN start AND end)
+                OR (:newEnd BETWEEN start AND end)
+            )
         )
     """)
     suspend fun hasOverlappingPeriods(newStart: Date, newEnd: Date): Boolean
@@ -41,9 +47,28 @@ interface SleepPeriodDao {
     @Update
     suspend fun update(sleepPeriod: SleepPeriodEntity)
 
+    @Query("UPDATE sleep_periods SET isDeleted = 1 WHERE id = :id")
+    suspend fun markAsDeleted(id: Long)
+
     @Delete
     suspend fun delete(sleepPeriod: SleepPeriodEntity)
 
     @Query("DELETE FROM sleep_periods")
     suspend fun deleteAll()
-} 
+
+    @Query("""
+        SELECT sleepDate as date, SUM(duration) / 60.0 as totalSleepHours
+        FROM sleep_periods
+        WHERE isDeleted = 0
+        AND sleepDate >= :startDate
+        AND sleepDate <= :endDate
+        GROUP BY sleepDate
+        ORDER BY sleepDate ASC
+    """)
+    fun getWeeklySleepData(startDate: Date, endDate: Date): Flow<List<WeeklySleepData>>
+}
+
+data class WeeklySleepData(
+    val date: Date,
+    val totalSleepHours: Float
+) 

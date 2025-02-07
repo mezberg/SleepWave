@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.runBlocking
 import com.mezberg.sleepwave.data.SleepPreferencesManager
 
-@Database(entities = [SleepPeriodEntity::class], version = 2, exportSchema = false)
+@Database(entities = [SleepPeriodEntity::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class SleepDatabase : RoomDatabase() {
     abstract fun sleepPeriodDao(): SleepPeriodDao
@@ -18,6 +18,15 @@ abstract class SleepDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: SleepDatabase? = null
+
+        private fun createMigration2to3() = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add isDeleted column with default value false (0)
+                database.execSQL(
+                    "ALTER TABLE sleep_periods ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
 
         private fun createMigration1to2(context: Context) = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
@@ -65,6 +74,7 @@ abstract class SleepDatabase : RoomDatabase() {
                     "sleep_database"
                 )
                 .addMigrations(createMigration1to2(context))
+                .addMigrations(createMigration2to3())
                 .build()
                 INSTANCE = instance
                 instance

@@ -16,6 +16,7 @@ import java.util.Locale
 import kotlin.math.exp
 import android.util.Log
 import java.text.DecimalFormat
+import com.mezberg.sleepwave.MainActivity
 
 data class SleepDebtInfo(
     val sleepDebt: Double,
@@ -79,7 +80,15 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 calculateSleepDebt() // Recalculate when needed sleep hours change
             }
         }
-        // Recalculate after a delay to ensure new sleep data is captured
+
+        // Listen for app foreground events
+        viewModelScope.launch {
+            MainActivity.appForegroundFlow.collect {
+                calculateSleepDebt()
+            }
+        }
+
+        // Initial delay for first calculation
         viewModelScope.launch {
             kotlinx.coroutines.delay(800) // Wait for 800ms
             calculateSleepDebt()
@@ -189,7 +198,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                     val debtContribution = sleepDeficit * exp(-daysAgo / TAU)
                     //Log.d("MainScreenViewModel", "Debt contribution: $debtContribution")
                     totalSleepDebt += debtContribution
-                    Log.d("MainScreenViewModel", "Total sleep debt: $totalSleepDebt")
+                    //Log.d("MainScreenViewModel", "Total sleep debt: $totalSleepDebt")
 
                     dailySleepInfo.add(
                         DailySleepInfo(

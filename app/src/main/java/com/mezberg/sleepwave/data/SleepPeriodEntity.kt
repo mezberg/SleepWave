@@ -12,5 +12,6 @@ data class SleepPeriodEntity(
     val end: Date,
     val duration: Long,
     val isPotentialSleep: Boolean,
-    val sleepDate: Date // The date to which this sleep period belongs
+    val sleepDate: Date, // The date to which this sleep period belongs
+    val isDeleted: Boolean = false // Flag to mark if the period is deleted
 ) 

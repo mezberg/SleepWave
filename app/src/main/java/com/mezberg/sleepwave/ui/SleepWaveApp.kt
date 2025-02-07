@@ -34,11 +34,12 @@ import com.mezberg.sleepwave.viewmodel.MainScreenViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun SleepWaveApp() {
+fun SleepWaveApp(
+    mainScreenViewModel: MainScreenViewModel,
+    sleepTrackingViewModel: SleepTrackingViewModel
+) {
     SleepWaveTheme {
         val navController = rememberNavController()
-        val sleepTrackingViewModel: SleepTrackingViewModel = viewModel()
-        val mainScreenViewModel: MainScreenViewModel = viewModel()
         val context = LocalContext.current
 
         Scaffold(
@@ -88,15 +89,12 @@ fun SleepWaveApp() {
                         },
                         onDeleteSleepPeriod = { sleepPeriod ->
                             sleepTrackingViewModel.deleteSleepPeriod(sleepPeriod)
-                            mainScreenViewModel.refreshSleepDebt()
                         },
                         onAddSleepPeriod = { startDate, startTime, endDate, endTime ->
-                            sleepTrackingViewModel.addSleepPeriod(startDate, startTime, endDate, endTime).also {
-                                if (it.isSuccess) {
-                                    mainScreenViewModel.refreshSleepDebt()
-                                }
-                            }
-                        }
+                            sleepTrackingViewModel.addSleepPeriod(startDate, startTime, endDate, endTime)
+                        },
+                        onPreviousWeek = { sleepTrackingViewModel.navigateToPreviousWeek() },
+                        onNextWeek = { sleepTrackingViewModel.navigateToNextWeek() }
                     )
                 }
                 composable(BottomNavItem.Settings.route) {
