@@ -123,9 +123,29 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                     currentHour <= nightEndHour
                 }
 
-                // Set end date to previous day if we're in night period
+                // Get the latest sleep period to check if we have any sleep for the current night
+                val latestSleep = database.sleepPeriodDao().getLatestSleepPeriod()
+                
+                // Calculate current night's date using the same logic as in SleepTrackingViewModel
+                val currentNightDate = Calendar.getInstance().apply {
+                    // Reset to start of day
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                    
+                    // If night period crosses midnight (e.g., 21:00-06:00)
+                    if (nightStartHour > nightEndHour) {
+                        // If current hour is between midnight and night end, this belongs to previous day's night
+                        if (currentHour < nightEndHour) {
+                            add(Calendar.DAY_OF_YEAR, -1)
+                        }
+                    }
+                }.time
+
+                // Set end date to previous day only if we're in night period AND no sleep detected for current night
                 val endDate = Calendar.getInstance().apply {
-                    if (isInNightPeriod) {
+                    if (isInNightPeriod && (latestSleep == null || latestSleep.sleepDate != currentNightDate)) {
                         add(Calendar.DAY_OF_YEAR, -1)
                     }
                     // Set time to end of day to include all sleep periods
