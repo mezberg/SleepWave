@@ -52,21 +52,21 @@ fun WeeklySleepGraph(
             isAntiAlias = true
             textSize = with(density) { 12.sp.toPx() }
             color = colors.onBackground.toArgb()
-            textAlign = android.graphics.Paint.Align.LEFT
+            textAlign = android.graphics.Paint.Align.RIGHT
         }
     }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "Weekly Sleep Duration",
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
 
         Box(
@@ -79,7 +79,7 @@ fun WeeklySleepGraph(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
-                    .padding(start = 32.dp, end = 16.dp, bottom = 8.dp)
+                    .padding(start = 48.dp, end = 16.dp, bottom = 8.dp)
             ) {
                 // Draw horizontal grid lines and hour labels
                 for (hour in 0..12 step 2) {
@@ -95,22 +95,21 @@ fun WeeklySleepGraph(
                     // Draw hour label
                     drawContext.canvas.nativeCanvas.drawText(
                         "${hour}h",
-                        0f,
-                        y - 4.dp.toPx(),
+                        -8.dp.toPx(),
+                        y + 4.dp.toPx(),
                         textPaint
                     )
                 }
 
                 // Calculate bar dimensions
-                val barWidth = size.width / 8 // Width for each day's bar
+                val barWidth = size.width / daysOfWeek.size // Width for each day's bar
                 val effectiveBarWidth = barWidth * 0.5f // Make bars wider
                 val cornerRadius = 8.dp.toPx()
 
                 // Draw bars for each day
                 sleepData.forEachIndexed { index, data ->
-                    val x = ((index + 1) * barWidth)
-
-                    val barHeight = (data.totalSleepHours / maxHours) * size.height
+                    val x = index * barWidth + (barWidth / 2) - (effectiveBarWidth / 2)
+                    val barHeight = (minOf(data.totalSleepHours, maxHours) / maxHours) * size.height
                     
                     drawRoundedBar(
                         color = colors.primary,
@@ -126,12 +125,12 @@ fun WeeklySleepGraph(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(start = 60.dp, end = 24.dp, top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(start = 48.dp, end = 16.dp, top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly 
             ) {
-                sleepData.forEachIndexed { index, _ ->
+                daysOfWeek.forEach { day ->
                     Text(
-                        text = daysOfWeek[index],
+                        text = day,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onBackground,
                         textAlign = TextAlign.Center,

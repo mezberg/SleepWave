@@ -12,6 +12,8 @@ import androidx.lifecycle.viewModelScope
 import com.mezberg.sleepwave.data.SleepDatabase
 import com.mezberg.sleepwave.data.SleepPeriodEntity
 import com.mezberg.sleepwave.data.SleepPreferencesManager
+import com.mezberg.sleepwave.ui.components.DailySleepData
+import com.mezberg.sleepwave.ui.components.SleepPeriodData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,7 +27,6 @@ import java.util.concurrent.TimeUnit
 import com.mezberg.sleepwave.utils.PermissionUtils
 import com.mezberg.sleepwave.MainActivity
 import com.mezberg.sleepwave.data.WeeklySleepData
-import com.mezberg.sleepwave.ui.components.DailySleepData
 
 // Data class representing a period when the screen is off
 data class ScreenOffPeriod(
@@ -47,6 +48,7 @@ data class SleepPeriodDisplayData(
 data class SleepTrackingUiState(
     val sleepPeriods: List<SleepPeriodDisplayData> = emptyList(),
     val weeklySleepData: List<DailySleepData> = emptyList(),
+    val weeklyBedtimeData: List<SleepPeriodData> = emptyList(),
     val weekStartDate: Date = Calendar.getInstance().apply {
         // Roll back to the most recent Monday
         val currentDayOfWeek = get(Calendar.DAY_OF_WEEK)
@@ -676,11 +678,39 @@ class SleepTrackingViewModel(application: Application) : AndroidViewModel(applic
                         totalSleepHours = sleepMap[date] ?: 0f
                     )
                 }
+
+                // Get bedtime consistency data
+                val bedtimeData = collectBedtimeData()
                 
-                _uiState.value = _uiState.value.copy(weeklySleepData = dailyData)
+                _uiState.value = _uiState.value.copy(
+                    weeklySleepData = dailyData,
+                    weeklyBedtimeData = bedtimeData
+                )
             }
         } catch (e: Exception) {
             Log.e("SleepTrackingViewModel", "Error collecting weekly sleep data: ${e.message}")
+        }
+    }
+
+    private suspend fun collectBedtimeData(): List<SleepPeriodData> {
+        return try {
+            // Get all sleep periods for the week
+            val sleepPeriods = database.sleepPeriodDao().getSleepPeriodsBetweenDates(
+                _uiState.value.weekStartDate,
+                _uiState.value.weekEndDate
+            )
+
+            // Convert to SleepPeriodData
+            sleepPeriods.map { period ->
+                SleepPeriodData(
+                    date = period.sleepDate,
+                    startTime = period.start,
+                    endTime = period.end
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("SleepTrackingViewModel", "Error collecting bedtime data: ${e.message}")
+            emptyList()
         }
     }
 } 

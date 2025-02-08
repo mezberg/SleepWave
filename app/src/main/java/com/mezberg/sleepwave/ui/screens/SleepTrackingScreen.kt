@@ -28,6 +28,7 @@ import com.mezberg.sleepwave.viewmodel.SleepTrackingUiState
 import com.mezberg.sleepwave.viewmodel.SleepTrackingViewModel
 import com.mezberg.sleepwave.ui.components.WeeklySleepGraph
 import com.mezberg.sleepwave.ui.components.WeekNavigationHeader
+import com.mezberg.sleepwave.ui.components.BedtimeConsistencyGraph
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.MainScope
@@ -141,7 +142,8 @@ fun SleepTrackingScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         WeekNavigationHeader(
                             startDate = uiState.weekStartDate,
@@ -154,7 +156,16 @@ fun SleepTrackingScreen(
                             sleepData = uiState.weeklySleepData,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(300.dp)
+                                .height(280.dp)
+                        )
+
+                        BedtimeConsistencyGraph(
+                            sleepPeriods = uiState.weeklyBedtimeData,
+                            nightStartHour = uiState.nightStartHour,
+                            nightEndHour = uiState.nightEndHour,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(280.dp)
                         )
                     }
                 }
