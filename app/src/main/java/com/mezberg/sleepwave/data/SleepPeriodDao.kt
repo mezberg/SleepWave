@@ -66,6 +66,9 @@ interface SleepPeriodDao {
         ORDER BY sleepDate ASC
     """)
     fun getWeeklySleepData(startDate: Date, endDate: Date): Flow<List<WeeklySleepData>>
+
+    @Query("SELECT * FROM sleep_periods WHERE sleepDate = :date AND isDeleted = 0 ORDER BY start DESC")
+    suspend fun getSleepPeriodsByDate(date: Date): List<SleepPeriodEntity>
 }
 
 data class WeeklySleepData(

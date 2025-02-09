@@ -28,6 +28,9 @@ import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.MainScreenViewModel
 import java.text.DecimalFormat
 import kotlin.math.min
+import com.mezberg.sleepwave.ui.theme.SleepDebtGreen
+import com.mezberg.sleepwave.ui.theme.SleepDebtRed
+import com.mezberg.sleepwave.ui.components.EnergyLevelsGraph
 
 @Composable
 fun SleepDebtCycle(
@@ -50,7 +53,7 @@ fun SleepDebtCycle(
 
         // Draw base circle (green)
         drawCircle(
-            color = Color(0xFF4CAF50), // Material Green
+            color = SleepDebtGreen,
             radius = radius,
             center = center,
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
@@ -64,7 +67,7 @@ fun SleepDebtCycle(
             val sweepAngle = fillRatio * 360f
 
             drawArc(
-                color = Color(0xFFE57373), // Material Red Light
+                color = SleepDebtRed,
                 startAngle = -90f,
                 sweepAngle = sweepAngle,
                 useCenter = false,
@@ -150,6 +153,7 @@ fun MainScreen(
     // Refresh data when screen becomes active
     LaunchedEffect(Unit) {
         viewModel.refreshSleepDebt()
+        viewModel.refreshEnergyLevels()
     }
 
     Surface(
@@ -183,6 +187,14 @@ fun MainScreen(
                     modifier = Modifier.padding(16.dp)
                 )
             }
+
+            // Add Energy Levels Graph here
+            EnergyLevelsGraph(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                energyPoints = uiState.energyLevelsInfo?.energyPoints ?: emptyList()
+            )
 
             uiState.sleepDebtInfo?.let { sleepDebtInfo ->
                 val sleepDebtHours = sleepDebtInfo.sleepDebt.toInt()

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mezberg.sleepwave.data.SleepDatabase
 import com.mezberg.sleepwave.data.SleepPreferencesManager
+import com.mezberg.sleepwave.data.SleepPeriodEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,8 +36,32 @@ data class DailySleepInfo(
     val daysAgo: Int
 )
 
+data class WakeUpInfo(
+    val date: Date,
+    val wakeUpTime: Date
+)
+
+data class EnergyTimePoint(
+    val time: Date,
+    val type: EnergyPointType
+)
+
+enum class EnergyPointType {
+    WAKE_UP,
+    MORNING_PEAK,
+    AFTERNOON_DIP,
+    EVENING_PEAK
+}
+
+data class EnergyLevelsInfo(
+    val averageWakeUpTime: Date?,
+    val wakeUpTimes: List<WakeUpInfo>,
+    val energyPoints: List<EnergyTimePoint>
+)
+
 data class MainScreenUiState(
     val sleepDebtInfo: SleepDebtInfo? = null,
+    val energyLevelsInfo: EnergyLevelsInfo? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
     val maxSleepDebt: Double = 0.0,
@@ -54,10 +79,17 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
     companion object {
         private const val TAU = 4.0 // Time constant in days
         private const val DAYS_TO_ANALYZE = 14L
+        private const val WAKE_UP_WINDOW_HOURS = 3 // Hours after night end to look for wake up time
+        
+        // Energy level timing constants (hours after wake up)
+        private const val MORNING_PEAK_HOURS = 3.0
+        private const val AFTERNOON_DIP_HOURS = 8.0
+        private const val EVENING_PEAK_HOURS = 11.0
     }
 
     init {
         calculateSleepDebt()
+        calculateEnergyLevels()
         // Collect preferences changes
         viewModelScope.launch {
             preferencesManager.maxSleepDebt.collect { maxDebt ->
@@ -78,6 +110,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
             preferencesManager.neededSleepHours.collect { hours ->
                 _uiState.value = _uiState.value.copy(neededSleepHours = hours)
                 calculateSleepDebt() // Recalculate when needed sleep hours change
+                calculateEnergyLevels()
             }
         }
 
@@ -85,6 +118,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             MainActivity.appForegroundFlow.collect {
                 calculateSleepDebt()
+                calculateEnergyLevels()
             }
         }
 
@@ -92,6 +126,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             kotlinx.coroutines.delay(800) // Wait for 800ms
             calculateSleepDebt()
+            calculateEnergyLevels()
         }
     }
 
@@ -250,5 +285,173 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 )
             }
         }
+    }
+
+    private fun calculateEnergyLevels() {
+        viewModelScope.launch {
+            try {
+                val endDate = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+
+                // Calculate current night's date
+                val currentDate = Calendar.getInstance()
+                val currentHour = currentDate.get(Calendar.HOUR_OF_DAY)
+                val nightStartHour = _uiState.value.nightStartHour
+                val nightEndHour = _uiState.value.nightEndHour
+
+                val currentNightDate = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                    
+                    if (nightStartHour > nightEndHour) {
+                        if (currentHour < nightEndHour) {
+                            add(Calendar.DAY_OF_YEAR, -1)
+                        }
+                    }
+                }.time
+
+                // Get current night's sleep periods
+                val currentNightSleepPeriods = database.sleepPeriodDao().getSleepPeriodsByDate(currentNightDate)
+
+                // Calculate current wake-up time
+                val currentWakeUpTime = calculateWakeUpTime(currentNightDate, currentNightSleepPeriods, nightStartHour, nightEndHour)
+
+                // Get historical data for average calculation
+                val startDate = Calendar.getInstance().apply {
+                    timeInMillis = endDate.timeInMillis
+                    add(Calendar.DAY_OF_YEAR, -DAYS_TO_ANALYZE.toInt())
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+
+                val sleepPeriods = database.sleepPeriodDao().getSleepPeriodsBetweenDates(
+                    startDate.time,
+                    endDate.time
+                )
+
+                val wakeUpTimes = mutableListOf<WakeUpInfo>()
+                val sleepByDate = sleepPeriods.groupBy { it.sleepDate }
+
+                // Calculate historical wake-up times (excluding current date)
+                for ((date, periods) in sleepByDate) {
+                    if (date == currentNightDate) continue
+                    
+                    val wakeUpTime = calculateWakeUpTime(date, periods, nightStartHour, nightEndHour)
+                    wakeUpTime?.let {
+                        wakeUpTimes.add(WakeUpInfo(date = date, wakeUpTime = it))
+                    }
+                }
+
+                // Calculate average wake-up time from historical data
+                var averageWakeUpTime: Date? = null
+                if (wakeUpTimes.isNotEmpty()) {
+                    val totalMinutes = wakeUpTimes.sumOf { wakeUpInfo ->
+                        val cal = Calendar.getInstance().apply { time = wakeUpInfo.wakeUpTime }
+                        cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+                    }
+                    val avgMinutes = totalMinutes / wakeUpTimes.size
+                    
+                    averageWakeUpTime = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, avgMinutes / 60)
+                        set(Calendar.MINUTE, avgMinutes % 60)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.time
+                }
+
+                // Calculate energy points using current wake-up time
+                val energyPoints = currentWakeUpTime?.let { wakeUpTime ->
+                    calculateEnergyTimePoints(wakeUpTime)
+                } ?: emptyList()
+
+                _uiState.value = _uiState.value.copy(
+                    energyLevelsInfo = EnergyLevelsInfo(
+                        averageWakeUpTime = averageWakeUpTime,
+                        wakeUpTimes = wakeUpTimes,
+                        energyPoints = energyPoints
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("MainScreenViewModel", "Error calculating energy levels", e)
+                _uiState.value = _uiState.value.copy(
+                    error = "Error calculating energy levels: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun calculateWakeUpTime(date: Date, periods: List<SleepPeriodEntity>, nightStartHour: Int, nightEndHour: Int): Date? {
+        val nightEndCal = Calendar.getInstance().apply {
+            time = date
+            set(Calendar.HOUR_OF_DAY, nightEndHour)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val nightStartCal = Calendar.getInstance().apply {
+            time = date
+            set(Calendar.HOUR_OF_DAY, nightStartHour)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val wakeUpWindowEndCal = Calendar.getInstance().apply {
+            time = nightEndCal.time
+            add(Calendar.HOUR_OF_DAY, WAKE_UP_WINDOW_HOURS)
+        }
+
+        return periods.filter { period ->
+            val periodStartCal = Calendar.getInstance().apply {
+                timeInMillis = period.start.time
+            }
+            periodStartCal.time.after(nightStartCal.time) && 
+            periodStartCal.time.before(wakeUpWindowEndCal.time)
+        }.maxByOrNull { it.end }?.let { period ->
+            Calendar.getInstance().apply {
+                timeInMillis = period.end.time
+            }.time
+        } ?: nightEndCal.time // Default to night end hour if no wake-up time found
+    }
+
+    private fun calculateEnergyTimePoints(wakeUpTime: Date): List<EnergyTimePoint> {
+        val points = mutableListOf<EnergyTimePoint>()
+        
+        // Add wake up point
+        points.add(EnergyTimePoint(wakeUpTime, EnergyPointType.WAKE_UP))
+        
+        // Calculate other points based on wake up time
+        val calendar = Calendar.getInstance()
+        
+        // Morning peak (3 hours after wake up)
+        calendar.time = wakeUpTime
+        calendar.add(Calendar.HOUR_OF_DAY, MORNING_PEAK_HOURS.toInt())
+        points.add(EnergyTimePoint(calendar.time, EnergyPointType.MORNING_PEAK))
+        
+        // Afternoon dip (8 hours after wake up)
+        calendar.time = wakeUpTime
+        calendar.add(Calendar.HOUR_OF_DAY, AFTERNOON_DIP_HOURS.toInt())
+        points.add(EnergyTimePoint(calendar.time, EnergyPointType.AFTERNOON_DIP))
+        
+        // Evening peak (11 hours after wake up)
+        calendar.time = wakeUpTime
+        calendar.add(Calendar.HOUR_OF_DAY, EVENING_PEAK_HOURS.toInt())
+        points.add(EnergyTimePoint(calendar.time, EnergyPointType.EVENING_PEAK))
+        
+        return points
+    }
+
+    // Add a public function to manually trigger recalculation
+    fun refreshEnergyLevels() {
+        calculateEnergyLevels()
     }
 } 

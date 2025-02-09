@@ -2,7 +2,9 @@ package com.mezberg.sleepwave.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -22,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
 import java.util.*
+import com.mezberg.sleepwave.ui.theme.GraphPrimary
+import com.mezberg.sleepwave.ui.theme.GraphOutlineVariant
 
 data class SleepPeriodData(
     val date: Date,
@@ -38,13 +42,13 @@ fun BedtimeConsistencyGraph(
 ) {
     val daysOfWeek = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     val density = LocalDensity.current
+    val onBackground = MaterialTheme.colorScheme.onBackground
     
     // Remember colors to avoid recomposition issues
     val colors = remember {
         object {
-            val primary = Color.Black
-            val outlineVariant = Color.LightGray
-            val onBackground = Color.Black
+            val primary = GraphPrimary
+            val outlineVariant = GraphOutlineVariant
         }
     }
     
@@ -53,151 +57,158 @@ fun BedtimeConsistencyGraph(
         Paint().asFrameworkPaint().apply {
             isAntiAlias = true
             textSize = with(density) { 12.sp.toPx() }
-            color = colors.onBackground.toArgb()
+            color = onBackground.toArgb()
             textAlign = android.graphics.Paint.Align.RIGHT
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp
     ) {
-        Text(
-            text = "Bedtime Consistency",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Canvas(
+            Text(
+                text = "Bedtime Consistency",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .padding(start = 48.dp, end = 16.dp, bottom = 8.dp)
+                    .height(280.dp)
             ) {
-                val hoursInDay = 24
-                
-                // Calculate the center of the night period
-                val nightCenter = if (nightStartHour > nightEndHour) {
-                    // Night period crosses midnight
-                    (nightStartHour + (24 + nightEndHour)) / 2f
-                } else {
-                    // Night period within same day
-                    (nightStartHour + nightEndHour) / 2f
-                }
-                
-                // Calculate visible range (18 hours centered around night period)
-                val visibleHours = 18
-                val halfVisible = visibleHours / 2f
-                
-                // Calculate first hour to display (centered around night period)
-                val firstHour = ((nightCenter - halfVisible + 24) % 24).toInt()
-                val lastHour = (firstHour + visibleHours) % 24
-
-                // Draw horizontal grid lines and hour labels
-                for (hour in 0..visibleHours step 3) {
-                    val displayHour = (firstHour + hour) % 24
-                    // Invert Y position calculation
-                    val y = size.height * (1 - hour.toFloat() / visibleHours)
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .padding(start = 48.dp, end = 16.dp, bottom = 8.dp)
+                ) {
+                    val hoursInDay = 24
                     
-                    // Draw grid line
-                    drawLine(
-                        color = colors.outlineVariant,
-                        start = Offset(0f, y),
-                        end = Offset(size.width, y),
-                        strokeWidth = 1.dp.toPx()
-                    )
+                    // Calculate the center of the night period
+                    val nightCenter = if (nightStartHour > nightEndHour) {
+                        // Night period crosses midnight
+                        (nightStartHour + (24 + nightEndHour)) / 2f
+                    } else {
+                        // Night period within same day
+                        (nightStartHour + nightEndHour) / 2f
+                    }
                     
-                    // Draw hour label
-                    val hourText = String.format("%02d:00", displayHour)
-                    drawContext.canvas.nativeCanvas.drawText(
-                        hourText,
-                        -8.dp.toPx(),
-                        y + 4.dp.toPx(),
-                        textPaint
-                    )
-                }
+                    // Calculate visible range (18 hours centered around night period)
+                    val visibleHours = 18
+                    val halfVisible = visibleHours / 2f
+                    
+                    // Calculate first hour to display (centered around night period)
+                    val firstHour = ((nightCenter - halfVisible + 24) % 24).toInt()
+                    val lastHour = (firstHour + visibleHours) % 24
 
-                // Calculate bar dimensions
-                val barWidth = size.width / daysOfWeek.size // Width for each day's bar
-                val effectiveBarWidth = barWidth * 0.5f // Make bars slightly wider
-                val cornerRadius = 8.dp.toPx()
-
-                // Group sleep periods by day
-                val periodsByDay = sleepPeriods.groupBy { period ->
-                    val calendar = Calendar.getInstance()
-                    calendar.time = period.date
-                    calendar.get(Calendar.DAY_OF_WEEK)
-                }
-
-                // Draw sleep period bars for each day
-                periodsByDay.forEach { (dayOfWeek, periods) ->
-                    val dayIndex = (dayOfWeek + 5) % 7 // Convert Calendar.DAY_OF_WEEK to 0-based index starting from Monday
-                    val x = dayIndex * barWidth + (barWidth / 2) - (effectiveBarWidth / 2)
-
-                    periods.forEach { period ->
-                        val calendar = Calendar.getInstance()
+                    // Draw horizontal grid lines and hour labels
+                    for (hour in 0..visibleHours step 3) {
+                        val displayHour = (firstHour + hour) % 24
+                        // Invert Y position calculation
+                        val y = size.height * (1 - hour.toFloat() / visibleHours)
                         
-                        // Calculate start position
-                        calendar.time = period.startTime
-                        val startHourOfDay = calendar.get(Calendar.HOUR_OF_DAY)
-                        val startMinute = calendar.get(Calendar.MINUTE)
-                        val startY = calculateYPosition(startHourOfDay, startMinute, firstHour, visibleHours, size.height)
+                        // Draw grid line
+                        drawLine(
+                            color = colors.outlineVariant,
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                        
+                        // Draw hour label
+                        val hourText = String.format("%02d:00", displayHour)
+                        drawContext.canvas.nativeCanvas.drawText(
+                            hourText,
+                            -8.dp.toPx(),
+                            y + 4.dp.toPx(),
+                            textPaint
+                        )
+                    }
 
-                        // Calculate end position
-                        calendar.time = period.endTime
-                        val endHourOfDay = calendar.get(Calendar.HOUR_OF_DAY)
-                        val endMinute = calendar.get(Calendar.MINUTE)
-                        val endY = calculateYPosition(endHourOfDay, endMinute, firstHour, visibleHours, size.height)
+                    // Calculate bar dimensions
+                    val barWidth = size.width / daysOfWeek.size // Width for each day's bar
+                    val effectiveBarWidth = barWidth * 0.5f // Make bars slightly wider
+                    val cornerRadius = 8.dp.toPx()
 
-                        // Calculate if sleep period is outside visible window
-                        val timeInHoursStart = startHourOfDay + startMinute / 60f
-                        val timeInHoursEnd = endHourOfDay + endMinute / 60f
-                        val normalizedStartHour = if (timeInHoursStart < firstHour) timeInHoursStart + 24 else timeInHoursStart
-                        val normalizedEndHour = if (timeInHoursEnd < firstHour) timeInHoursEnd + 24 else timeInHoursEnd
-                        val relativeStartHour = normalizedStartHour - firstHour
-                        val relativeEndHour = normalizedEndHour - firstHour
+                    // Group sleep periods by day
+                    val periodsByDay = sleepPeriods.groupBy { period ->
+                        val calendar = Calendar.getInstance()
+                        calendar.time = period.date
+                        calendar.get(Calendar.DAY_OF_WEEK)
+                    }
 
-                        if (relativeStartHour >= 0 && relativeStartHour <= visibleHours &&
-                            relativeEndHour >= 0 && relativeEndHour <= visibleHours) {
-                            // Draw normal sleep period bar if within visible window
-                            drawRoundedBar(
-                                color = colors.primary,
-                                topLeft = Offset(x, startY),
-                                size = Size(effectiveBarWidth, endY - startY),
-                                cornerRadius = CornerRadius(cornerRadius, cornerRadius)
-                            )
-                        } else if (relativeStartHour > visibleHours || relativeEndHour > visibleHours) {
-                            // Draw up arrow at the top of the graph if sleep period is after visible window
-                            drawUpArrow(x + effectiveBarWidth / 2, 8.dp.toPx(), colors.primary)
+                    // Draw sleep period bars for each day
+                    periodsByDay.forEach { (dayOfWeek, periods) ->
+                        val dayIndex = (dayOfWeek + 5) % 7 // Convert Calendar.DAY_OF_WEEK to 0-based index starting from Monday
+                        val x = dayIndex * barWidth + (barWidth / 2) - (effectiveBarWidth / 2)
+
+                        periods.forEach { period ->
+                            val calendar = Calendar.getInstance()
+                            
+                            // Calculate start position
+                            calendar.time = period.startTime
+                            val startHourOfDay = calendar.get(Calendar.HOUR_OF_DAY)
+                            val startMinute = calendar.get(Calendar.MINUTE)
+                            val startY = calculateYPosition(startHourOfDay, startMinute, firstHour, visibleHours, size.height)
+
+                            // Calculate end position
+                            calendar.time = period.endTime
+                            val endHourOfDay = calendar.get(Calendar.HOUR_OF_DAY)
+                            val endMinute = calendar.get(Calendar.MINUTE)
+                            val endY = calculateYPosition(endHourOfDay, endMinute, firstHour, visibleHours, size.height)
+
+                            // Calculate if sleep period is outside visible window
+                            val timeInHoursStart = startHourOfDay + startMinute / 60f
+                            val timeInHoursEnd = endHourOfDay + endMinute / 60f
+                            val normalizedStartHour = if (timeInHoursStart < firstHour) timeInHoursStart + 24 else timeInHoursStart
+                            val normalizedEndHour = if (timeInHoursEnd < firstHour) timeInHoursEnd + 24 else timeInHoursEnd
+                            val relativeStartHour = normalizedStartHour - firstHour
+                            val relativeEndHour = normalizedEndHour - firstHour
+
+                            if (relativeStartHour >= 0 && relativeStartHour <= visibleHours &&
+                                relativeEndHour >= 0 && relativeEndHour <= visibleHours) {
+                                // Draw normal sleep period bar if within visible window
+                                drawRoundedBar(
+                                    color = colors.primary,
+                                    topLeft = Offset(x, startY),
+                                    size = Size(effectiveBarWidth, endY - startY),
+                                    cornerRadius = CornerRadius(cornerRadius, cornerRadius)
+                                )
+                            } else if (relativeStartHour > visibleHours || relativeEndHour > visibleHours) {
+                                // Draw up arrow at the top of the graph if sleep period is after visible window
+                                drawUpArrow(x + effectiveBarWidth / 2, 8.dp.toPx(), colors.primary)
+                            }
                         }
                     }
                 }
-            }
 
-            // Day labels at the bottom
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(start = 48.dp, end = 16.dp, top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                daysOfWeek.forEach { day ->
-                    Text(
-                        text = day,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f)
-                    )
+                // Day labels at the bottom
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(start = 48.dp, end = 16.dp, top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    daysOfWeek.forEach { day ->
+                        Text(
+                            text = day,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }

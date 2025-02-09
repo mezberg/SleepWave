@@ -33,20 +33,23 @@ fun WeekNavigationHeader(
         IconButton(onClick = onPreviousWeek) {
             Icon(
                 imageVector = Icons.Default.ChevronLeft,
-                contentDescription = "Previous week"
+                contentDescription = "Previous week",
+                tint = MaterialTheme.colorScheme.primary
             )
         }
 
         Text(
             text = "${dateFormat.format(startDate)} – ${dateFormat.format(endDate)}",
             style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
         )
 
         IconButton(onClick = onNextWeek) {
             Icon(
                 imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Next week"
+                contentDescription = "Next week",
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }

@@ -77,7 +77,8 @@ fun SleepTrackingScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back to graphs"
+                            contentDescription = "Back to graphs",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 } else {
