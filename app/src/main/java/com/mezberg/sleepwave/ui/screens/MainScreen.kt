@@ -192,7 +192,7 @@ fun MainScreen(
             EnergyLevelsGraph(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 16.dp),
                 energyPoints = uiState.energyLevelsInfo?.energyPoints ?: emptyList()
             )
 
@@ -207,7 +207,7 @@ fun MainScreen(
                     maxSleepDebt = uiState.maxSleepDebt.toFloat(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 24.dp)
+                        .padding(vertical = 16.dp)
                 )
 
                 Text(

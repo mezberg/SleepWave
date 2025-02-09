@@ -19,7 +19,7 @@ import com.mezberg.sleepwave.viewmodel.EnergyTimePoint
 import com.mezberg.sleepwave.viewmodel.EnergyPointType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-
+import androidx.compose.foundation.shape.RoundedCornerShape
 import java.text.SimpleDateFormat
 import java.util.*
 import android.graphics.Paint
@@ -35,7 +35,7 @@ fun EnergyLevelsGraph(
 ) {
     Surface(
         modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp
     ) {
@@ -254,7 +254,7 @@ fun EnergyLevelsGraph(
                                     path = path,
                                     color = primaryColor,
                                     style = Stroke(
-                                        width = 5f,
+                                        width = 10f,
                                         cap = StrokeCap.Round,
                                         join = StrokeJoin.Round
                                     )
