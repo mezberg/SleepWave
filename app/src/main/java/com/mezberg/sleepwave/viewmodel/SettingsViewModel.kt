@@ -8,12 +8,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+
 
 data class SettingsUiState(
     val neededSleepHours: Double = SleepPreferencesManager.DEFAULT_NEEDED_SLEEP_HOURS,
     val tempNeededSleepHours: Double = SleepPreferencesManager.DEFAULT_NEEDED_SLEEP_HOURS,
     val nightStartHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_START_HOUR,
-    val nightEndHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_END_HOUR
+    val nightEndHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_END_HOUR,
+    val tempNightStartHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_START_HOUR,
+    val tempNightEndHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_END_HOUR
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -33,12 +39,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
         viewModelScope.launch {
             preferencesManager.nightStartHour.collect { hour ->
-                _uiState.value = _uiState.value.copy(nightStartHour = hour)
+                _uiState.value = _uiState.value.copy(
+                    nightStartHour = hour,
+                    tempNightStartHour = hour
+                )
             }
         }
         viewModelScope.launch {
             preferencesManager.nightEndHour.collect { hour ->
-                _uiState.value = _uiState.value.copy(nightEndHour = hour)
+                _uiState.value = _uiState.value.copy(
+                    nightEndHour = hour,
+                    tempNightEndHour = hour
+                )
             }
         }
     }
@@ -47,27 +59,47 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _uiState.value = _uiState.value.copy(tempNeededSleepHours = hours)
     }
 
+    fun updateTempNightStartHour(hour: Int) {
+        if (hour in 0..23) {
+            _uiState.value = _uiState.value.copy(tempNightStartHour = hour)
+        }
+    }
+
+    fun updateTempNightEndHour(hour: Int) {
+        if (hour in 0..23) {
+            _uiState.value = _uiState.value.copy(tempNightEndHour = hour)
+        }
+    }
+
     fun applyNeededSleepHours() {
         viewModelScope.launch {
             preferencesManager.updateNeededSleepHours(_uiState.value.tempNeededSleepHours)
         }
     }
 
+    fun applyNightHours() {
+        viewModelScope.launch {
+            coroutineScope {
+                val startUpdate = async { 
+                    preferencesManager.updateNightStartHour(_uiState.value.tempNightStartHour)
+                }
+                val endUpdate = async {
+                    preferencesManager.updateNightEndHour(_uiState.value.tempNightEndHour)
+                }
+                awaitAll(startUpdate, endUpdate)
+            }
+        }
+    }
+
     fun revertChanges() {
         _uiState.value = _uiState.value.copy(
-            tempNeededSleepHours = _uiState.value.neededSleepHours
+            tempNeededSleepHours = _uiState.value.neededSleepHours,
+            tempNightStartHour = _uiState.value.nightStartHour,
+            tempNightEndHour = _uiState.value.nightEndHour
         )
     }
 
-    fun updateNightStartHour(hour: Int) {
-        viewModelScope.launch {
-            preferencesManager.updateNightStartHour(hour)
-        }
-    }
-
-    fun updateNightEndHour(hour: Int) {
-        viewModelScope.launch {
-            preferencesManager.updateNightEndHour(hour)
-        }
+    fun isTimeValid(hour: Int): Boolean {
+        return hour in 0..23
     }
 } 

@@ -14,6 +14,139 @@ import com.mezberg.sleepwave.R
 import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+
+@Composable
+fun TimePickerButton(
+    hour: Int,
+    onHourChange: (Int) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:00") }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        OutlinedButton(
+            onClick = { showDialog = true }
+        ) {
+            Text(LocalTime.of(hour, 0).format(timeFormatter))
+        }
+    }
+
+    if (showDialog) {
+        TimePickerDialog(
+            onDismissRequest = { showDialog = false },
+            onConfirm = { 
+                showDialog = false
+                onHourChange(it)
+            },
+            initialHour = hour
+        )
+    }
+}
+
+@Composable
+fun TimePickerDialog(
+    onDismissRequest: () -> Unit,
+    onConfirm: (Int) -> Unit,
+    initialHour: Int
+) {
+    var selectedHour by remember { mutableStateOf(initialHour) }
+
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Text("Select hour") },
+        text = {
+            Column {
+                TimePicker(
+                    selectedHour = selectedHour,
+                    onHourSelected = { selectedHour = it }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(selectedHour)
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimePicker(
+    selectedHour: Int,
+    onHourSelected: (Int) -> Unit
+) {
+    ExposedDropdownMenuBox(
+        expanded = false,
+        onExpandedChange = {}
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Hour",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Display hours in 4 rows of 6 hours each
+                for (rowStart in 0..22 step 4) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        for (h in rowStart until rowStart + 4) {
+                            val timeText = String.format("%02d:00", h)
+                            Surface(
+                                modifier = Modifier.padding(4.dp),
+                                shape = MaterialTheme.shapes.small,
+                                color = if (h == selectedHour) 
+                                    MaterialTheme.colorScheme.primaryContainer 
+                                else 
+                                    MaterialTheme.colorScheme.surface,
+                                onClick = { onHourSelected(h) }
+                            ) {
+                                Text(
+                                    text = timeText,
+                                    modifier = Modifier.padding(8.dp),
+                                    color = if (h == selectedHour)
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun SettingsScreen(
@@ -98,8 +231,48 @@ fun SettingsScreen(
                 }
             }
 
-            // Night Hours Section (to be implemented)
-            // ...
+            // Night Hours Section
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Night Hours",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Button(
+                        onClick = { viewModel.applyNightHours() },
+                        enabled = uiState.tempNightStartHour != uiState.nightStartHour || 
+                                uiState.tempNightEndHour != uiState.nightEndHour
+                    ) {
+                        Text("Apply")
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TimePickerButton(
+                        hour = uiState.tempNightStartHour,
+                        onHourChange = viewModel::updateTempNightStartHour,
+                        label = "Bedtime"
+                    )
+
+                    TimePickerButton(
+                        hour = uiState.tempNightEndHour,
+                        onHourChange = viewModel::updateTempNightEndHour,
+                        label = "Wake up time"
+                    )
+                }
+            }
         }
     }
 }
