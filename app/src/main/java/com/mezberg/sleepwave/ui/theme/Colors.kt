@@ -10,6 +10,7 @@ object MaterialColors {
     val Blue = Color(0xFF2196F3)
     val Teal = Color(0xFF03DAC6)
     val DeepPurple = Color(0xFF3700B3)
+    val Orange = Color(0xFFFF9800)  // Adding Material Orange
 
     // Neutral colors
     val White = Color(0xFFFFFFFF)
@@ -45,6 +46,7 @@ val White = MaterialColors.White
 val Black = MaterialColors.Black
 val DarkBackground = MaterialColors.DarkBackground
 val Error = MaterialColors.Error
+val Orange = MaterialColors.Orange  // Exposing Orange
 
 // Graph-specific colors
 val GraphPrimary = GraphColors.Primary

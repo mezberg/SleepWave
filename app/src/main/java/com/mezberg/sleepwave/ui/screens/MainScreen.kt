@@ -31,6 +31,8 @@ import kotlin.math.min
 import com.mezberg.sleepwave.ui.theme.SleepDebtGreen
 import com.mezberg.sleepwave.ui.theme.SleepDebtRed
 import com.mezberg.sleepwave.ui.components.EnergyLevelsGraph
+import android.util.Log
+
 
 @Composable
 fun SleepDebtCycle(

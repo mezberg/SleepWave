@@ -26,6 +26,7 @@ import android.graphics.Paint
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
 import android.util.Log
+import com.mezberg.sleepwave.ui.theme.*
 
 
 @Composable
@@ -33,6 +34,17 @@ fun EnergyLevelsGraph(
     modifier: Modifier = Modifier,
     energyPoints: List<EnergyTimePoint>
 ) {
+    // Add current time state to trigger recomposition
+    var currentTimeState by remember { mutableStateOf(Calendar.getInstance().time) }
+    
+    // Update current time every second
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(10000)
+            currentTimeState = Calendar.getInstance().time
+        }
+    }
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
@@ -55,22 +67,20 @@ fun EnergyLevelsGraph(
                 val scrollState = rememberScrollState()
                 val coroutineScope = rememberCoroutineScope()
                 
-                // Calculate initial scroll position based on wake-up time
-                LaunchedEffect(energyPoints) {
-                    Log.d("EnergyLevelsGraph", "launching")
-                    val wakeUpTime = energyPoints.first().time
+                // Calculate initial scroll position based on current time
+                LaunchedEffect(energyPoints, currentTimeState) {
                     val baseCalendar = Calendar.getInstance().apply {
-                        time = wakeUpTime
+                        time = energyPoints.first().time
                         add(Calendar.HOUR_OF_DAY, -6) // 6 hours before wake-up time
                         set(Calendar.MINUTE, 0)
                         set(Calendar.SECOND, 0)
                         set(Calendar.MILLISECOND, 0)
                     }
                     
-                    //val currentCal = Calendar.getInstance()                 
-                    //val hoursSince4am = ((currentCal.timeInMillis - baseCalendar.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
-                    //val scrollPosition = (hoursSince4am / 24f * 600f).toInt() // 600dp is our canvas width
-                    val scrollPosition = 400
+                    val currentCal = Calendar.getInstance()
+                    val hoursSince4am = ((currentCal.timeInMillis - baseCalendar.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
+                    val scrollPosition = (hoursSince4am / 24f * 600f).toInt() + 200 // Center the current time
+                    
                     Log.d("EnergyLevelsGraph", "scrollPosition: $scrollPosition")
                     coroutineScope.launch {
                         scrollState.scrollTo(maxOf(0, scrollPosition))
@@ -80,6 +90,7 @@ fun EnergyLevelsGraph(
                 // Extract colors before Canvas
                 val primaryColor = MaterialTheme.colorScheme.primary
                 val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+                val currentTimeColor = Orange // Using our new Orange color
                 val density = LocalDensity.current
 
                 Box(
@@ -205,6 +216,44 @@ fun EnergyLevelsGraph(
                                     paint
                                 )
                             }
+
+                            // Draw current time line
+                            val currentTime = Calendar.getInstance().time
+                            val currentHoursSince4am = ((currentTime.time - baseCalendar.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
+                            val currentTimeX = padding + (currentHoursSince4am / 24f) * graphWidth
+
+                            // Draw current time text
+                            val currentTimeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                            val currentTimeText = currentTimeFormat.format(currentTime)
+                            val currentTimePaint = Paint().apply {
+                                color = currentTimeColor.toArgb()
+                                textSize = with(density) { 12.dp.toPx() }
+                                textAlign = Paint.Align.CENTER
+                                isAntiAlias = true
+                                isFakeBoldText = false
+                            }
+                            
+                            // Draw time text above the line
+                            drawContext.canvas.nativeCanvas.drawText(
+                                currentTimeText,
+                                currentTimeX,
+                                padding - 20f, // Position above the line
+                                currentTimePaint
+                            )
+
+                            // Draw dotted line for current time
+                            val pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                                floatArrayOf(10f, 10f), // 10px dash, 10px gap
+                                0f
+                            )
+                            
+                            drawLine(
+                                color = currentTimeColor.copy(alpha = 0.8f),
+                                start = Offset(currentTimeX, padding),
+                                end = Offset(currentTimeX, height - padding),
+                                strokeWidth = 4f,
+                                pathEffect = pathEffect
+                            )
 
                             // Map energy points to screen coordinates
                             val wakeUpTime = energyPoints.first().time

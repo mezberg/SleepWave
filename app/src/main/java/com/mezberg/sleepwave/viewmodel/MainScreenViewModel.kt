@@ -54,8 +54,8 @@ enum class EnergyPointType {
 }
 
 data class EnergyLevelsInfo(
-    val averageWakeUpTime: Date?,
-    val wakeUpTimes: List<WakeUpInfo>,
+    /*val averageWakeUpTime: Date?,
+    val wakeUpTimes: List<WakeUpInfo>,*/
     val energyPoints: List<EnergyTimePoint>
 )
 
@@ -327,7 +327,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 // Calculate current wake-up time
                 val currentWakeUpTime = calculateWakeUpTime(currentNightDate, currentNightSleepPeriods, nightStartHour, nightEndHour)
 
-                // Get historical data for average calculation
+                /*// Get historical data for average calculation
                 val startDate = Calendar.getInstance().apply {
                     timeInMillis = endDate.timeInMillis
                     add(Calendar.DAY_OF_YEAR, -DAYS_TO_ANALYZE.toInt())
@@ -335,7 +335,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                     set(Calendar.MINUTE, 0)
                     set(Calendar.SECOND, 0)
                     set(Calendar.MILLISECOND, 0)
-                }
+                } 
 
                 val sleepPeriods = database.sleepPeriodDao().getSleepPeriodsBetweenDates(
                     startDate.time,
@@ -370,7 +370,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                         set(Calendar.SECOND, 0)
                         set(Calendar.MILLISECOND, 0)
                     }.time
-                }
+                } */
 
                 // Calculate energy points using current wake-up time
                 val energyPoints = currentWakeUpTime?.let { wakeUpTime ->
@@ -379,8 +379,8 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 
                 _uiState.value = _uiState.value.copy(
                     energyLevelsInfo = EnergyLevelsInfo(
-                        averageWakeUpTime = averageWakeUpTime,
-                        wakeUpTimes = wakeUpTimes,
+                        /*averageWakeUpTime = averageWakeUpTime,
+                        wakeUpTimes = wakeUpTimes,*/
                         energyPoints = energyPoints
                     )
                 )
