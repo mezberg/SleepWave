@@ -102,4 +102,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun isTimeValid(hour: Int): Boolean {
         return hour in 0..23
     }
+
+    fun resetOnboarding() {
+        viewModelScope.launch {
+            preferencesManager.resetOnboarding()
+        }
+    }
 } 

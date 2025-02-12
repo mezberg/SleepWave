@@ -78,9 +78,17 @@ fun EnergyLevelsGraph(
                     }
                     
                     val currentCal = Calendar.getInstance()
-                    val hoursSince4am = ((currentCal.timeInMillis - baseCalendar.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
-                    val scrollPosition = (hoursSince4am / 24f * 600f).toInt() + 200 // Center the current time
+                    val baseHour = baseCalendar.get(Calendar.HOUR_OF_DAY)
+                    val currentHour = currentCal.get(Calendar.HOUR_OF_DAY)
                     
+                    val hoursSince4am = if (currentHour < baseHour) {
+                        // If current time is before base time, calculate: 24h - base time + current time
+                        24f - ((baseCalendar.timeInMillis - currentCal.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
+                    } else {
+                        ((currentCal.timeInMillis - baseCalendar.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
+                    }
+                    
+                    val scrollPosition = (hoursSince4am / 24f * 800f).toInt() // Center the current time
                     Log.d("EnergyLevelsGraph", "scrollPosition: $scrollPosition")
                     coroutineScope.launch {
                         scrollState.scrollTo(maxOf(0, scrollPosition))
@@ -218,13 +226,22 @@ fun EnergyLevelsGraph(
                             }
 
                             // Draw current time line
-                            val currentTime = Calendar.getInstance().time
-                            val currentHoursSince4am = ((currentTime.time - baseCalendar.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
+                            val currentTime = Calendar.getInstance()
+                            val baseHour = baseCalendar.get(Calendar.HOUR_OF_DAY)
+                            val currentHour = currentTime.get(Calendar.HOUR_OF_DAY)
+                            
+                            val currentHoursSince4am = if (currentHour < baseHour) {
+                                // If current time is before base time, calculate: 24h - base time + current time
+                                24f - ((baseCalendar.timeInMillis - currentTime.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
+                            } else {
+                                ((currentTime.timeInMillis - baseCalendar.timeInMillis) / (1000.0 * 60 * 60)).toFloat()
+                            }
+                            
                             val currentTimeX = padding + (currentHoursSince4am / 24f) * graphWidth
 
                             // Draw current time text
                             val currentTimeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-                            val currentTimeText = currentTimeFormat.format(currentTime)
+                            val currentTimeText = currentTimeFormat.format(Calendar.getInstance().time) // Use actual current time for display
                             val currentTimePaint = Paint().apply {
                                 color = currentTimeColor.toArgb()
                                 textSize = with(density) { 12.dp.toPx() }

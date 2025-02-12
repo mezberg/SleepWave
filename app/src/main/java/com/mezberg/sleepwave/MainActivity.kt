@@ -7,11 +7,19 @@ import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.room.Room
 import com.mezberg.sleepwave.ui.SleepWaveApp
 import com.mezberg.sleepwave.viewmodel.MainScreenViewModel
 import com.mezberg.sleepwave.viewmodel.SleepTrackingViewModel
+import com.mezberg.sleepwave.viewmodel.OnboardViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
+import com.mezberg.sleepwave.data.SleepPreferencesManager
+import com.mezberg.sleepwave.data.SleepDatabase
+import androidx.lifecycle.viewmodel.compose.viewModel
+
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -19,13 +27,18 @@ class MainActivity : ComponentActivity() {
         val appForegroundFlow = MutableSharedFlow<Unit>()
     }
 
-    // Initialize ViewModels at Activity level
-    private val mainScreenViewModel: MainScreenViewModel by viewModels()
-    private val sleepTrackingViewModel: SleepTrackingViewModel by viewModels()
+    private lateinit var sleepPreferencesManager: SleepPreferencesManager
+    private lateinit var sleepDatabase: SleepDatabase
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+        sleepPreferencesManager = SleepPreferencesManager(applicationContext)
+        sleepDatabase = Room.databaseBuilder(
+            applicationContext,
+            SleepDatabase::class.java,
+            "sleep_database"
+        ).build()
+
         // Observe lifecycle to detect foreground state
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -35,9 +48,20 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            val mainScreenViewModel = viewModel<MainScreenViewModel>()
+            val sleepTrackingViewModel = viewModel<SleepTrackingViewModel>()
+            val onboardViewModel = viewModel<OnboardViewModel>(
+                factory = object : ViewModelProvider.Factory {
+                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                        return OnboardViewModel(sleepPreferencesManager) as T
+                    }
+                }
+            )
+
             SleepWaveApp(
                 mainScreenViewModel = mainScreenViewModel,
-                sleepTrackingViewModel = sleepTrackingViewModel
+                sleepTrackingViewModel = sleepTrackingViewModel,
+                onboardViewModel = onboardViewModel
             )
         }
     }

@@ -16,6 +16,8 @@ import com.mezberg.sleepwave.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.graphics.Color
+
 
 @Composable
 fun TimePickerButton(
@@ -271,6 +273,29 @@ fun SettingsScreen(
                         onHourChange = viewModel::updateTempNightEndHour,
                         label = "Wake up time"
                     )
+                }
+            }
+
+            // Reset Onboarding Section
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Debug Options",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedButton(
+                    onClick = { viewModel.resetOnboarding() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Black, // Set button background color to black
+                        contentColor = Color.White // Set button text color to white
+                    )
+                ) {
+                    Text("Reset Onboarding")
                 }
             }
         }
