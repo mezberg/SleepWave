@@ -20,6 +20,7 @@ class SleepPreferencesManager(private val context: Context) {
         private val NIGHT_START_HOUR = intPreferencesKey("night_start_hour")
         private val NIGHT_END_HOUR = intPreferencesKey("night_end_hour")
         private val NEEDED_SLEEP_HOURS = doublePreferencesKey("needed_sleep_hours")
+        private val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
 
         // Default values used when preferences are not yet set
         const val DEFAULT_NIGHT_START_HOUR = 1 // 7 PM
@@ -93,6 +94,19 @@ class SleepPreferencesManager(private val context: Context) {
             preferences[NEEDED_SLEEP_HOURS] ?: DEFAULT_NEEDED_SLEEP_HOURS
         }
 
+    // Flow to observe notifications enabled status
+    val notificationsEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[NOTIFICATIONS_ENABLED] ?: true // Enabled by default
+        }
+
     // Update functions to modify preferences
     suspend fun updateMaxSleepDebt(maxDebt: Double) {
         context.dataStore.edit { preferences ->
@@ -132,6 +146,13 @@ class SleepPreferencesManager(private val context: Context) {
     suspend fun resetOnboarding() {
         context.dataStore.edit { preferences ->
             preferences[HAS_COMPLETED_ONBOARDING] = false
+        }
+    }
+
+    // Update notifications enabled status
+    suspend fun updateNotificationsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[NOTIFICATIONS_ENABLED] = enabled
         }
     }
 } 

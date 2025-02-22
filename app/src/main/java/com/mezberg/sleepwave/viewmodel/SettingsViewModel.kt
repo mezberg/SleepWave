@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mezberg.sleepwave.data.SleepPreferencesManager
+import com.mezberg.sleepwave.notifications.NotificationHelper
+import com.mezberg.sleepwave.utils.PermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,11 +21,14 @@ data class SettingsUiState(
     val nightStartHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_START_HOUR,
     val nightEndHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_END_HOUR,
     val tempNightStartHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_START_HOUR,
-    val tempNightEndHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_END_HOUR
+    val tempNightEndHour: Int = SleepPreferencesManager.DEFAULT_NIGHT_END_HOUR,
+    val notificationsEnabled: Boolean = true,
+    val showNotificationPermissionRequest: Boolean = false
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val preferencesManager = SleepPreferencesManager(application)
+    private val notificationHelper = NotificationHelper(application)
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
@@ -51,6 +56,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     nightEndHour = hour,
                     tempNightEndHour = hour
                 )
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.notificationsEnabled.collect { enabled ->
+                _uiState.value = _uiState.value.copy(notificationsEnabled = enabled)
             }
         }
     }
@@ -106,6 +116,36 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun resetOnboarding() {
         viewModelScope.launch {
             preferencesManager.resetOnboarding()
+        }
+    }
+
+    fun toggleNotifications(enabled: Boolean) {
+        if (enabled && !PermissionUtils.hasNotificationPermission(getApplication())) {
+            // Show permission request dialog
+            _uiState.value = _uiState.value.copy(showNotificationPermissionRequest = true)
+            return
+        }
+
+        viewModelScope.launch {
+            if (enabled) {
+                // Re-enable notifications
+                preferencesManager.updateNotificationsEnabled(true)
+            } else {
+                // Disable and cancel all notifications
+                preferencesManager.updateNotificationsEnabled(false)
+                notificationHelper.cancelAllScheduledNotifications()
+            }
+        }
+    }
+
+    fun onNotificationPermissionResult(granted: Boolean) {
+        _uiState.value = _uiState.value.copy(showNotificationPermissionRequest = false)
+        if (granted) {
+            viewModelScope.launch {
+                preferencesManager.updateNotificationsEnabled(true)
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(notificationsEnabled = false)
         }
     }
 } 

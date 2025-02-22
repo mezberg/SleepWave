@@ -29,6 +29,7 @@ import com.mezberg.sleepwave.ui.screens.MainScreen
 import com.mezberg.sleepwave.ui.screens.OnboardingScreen
 import com.mezberg.sleepwave.ui.screens.SettingsScreen
 import com.mezberg.sleepwave.ui.screens.SleepTrackingScreen
+import com.mezberg.sleepwave.ui.screens.SleepGraphsScreen
 import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.SleepTrackingViewModel
 import com.mezberg.sleepwave.viewmodel.MainScreenViewModel
@@ -95,7 +96,7 @@ fun SleepWaveApp(
                     composable(BottomNavItem.Home.route) {
                         MainScreen()
                     }
-                    composable(BottomNavItem.Analysis.route) {
+                    composable(BottomNavItem.Sleeps.route) {
                         val uiState by sleepTrackingViewModel.uiState.collectAsState()
                         SleepTrackingScreen(
                             uiState = uiState,
@@ -108,6 +109,14 @@ fun SleepWaveApp(
                             onAddSleepPeriod = { startDate, startTime, endDate, endTime ->
                                 sleepTrackingViewModel.addSleepPeriod(startDate, startTime, endDate, endTime)
                             },
+                            onPreviousWeek = { sleepTrackingViewModel.navigateToPreviousWeek() },
+                            onNextWeek = { sleepTrackingViewModel.navigateToNextWeek() }
+                        )
+                    }
+                    composable(BottomNavItem.Graphs.route) {
+                        val uiState by sleepTrackingViewModel.uiState.collectAsState()
+                        SleepGraphsScreen(
+                            uiState = uiState,
                             onPreviousWeek = { sleepTrackingViewModel.navigateToPreviousWeek() },
                             onNextWeek = { sleepTrackingViewModel.navigateToNextWeek() }
                         )

@@ -8,4 +8,13 @@
     <string name="home">Home</string>
     <string name="analysis">Analysis</string>
     <string name="settings">Settings</string>
+    <string name="sleeps">Sleeps</string>
+    <string name="graphs">Graphs</string>
+    <string name="sleep_graphs">Sleep Graphs</string>
+    <string name="notification_channel_name">Energy Schedule</string>
+    <string name="notification_channel_description">Notifications for your daily energy schedule</string>
+    <string name="notification_title">Check Your Energy Schedule</string>
+    <string name="notification_text">Time to check your energy levels and plan your activities!</string>
+    <string name="notifications">Notifications</string>
+    <string name="notifications_description">Enable or disable energy schedule notifications. When enabled, you\'ll receive daily reminders to check your energy levels.</string>
 </resources>

@@ -18,6 +18,7 @@ import kotlin.math.exp
 import android.util.Log
 import java.text.DecimalFormat
 import com.mezberg.sleepwave.MainActivity
+import com.mezberg.sleepwave.notifications.NotificationHelper
 
 data class SleepDebtInfo(
     val sleepDebt: Double,
@@ -73,6 +74,7 @@ data class MainScreenUiState(
 class MainScreenViewModel(application: Application) : AndroidViewModel(application) {
     private val database = SleepDatabase.getDatabase(application)
     private val preferencesManager = SleepPreferencesManager(application)
+    private val notificationHelper = NotificationHelper(application)
     private val _uiState = MutableStateFlow(MainScreenUiState())
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
@@ -88,6 +90,9 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     init {
+        // Create notification channel
+        notificationHelper.createNotificationChannel()
+        
         calculateSleepDebt()
         calculateEnergyLevels()
         // Collect preferences changes
@@ -99,11 +104,15 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             preferencesManager.nightStartHour.collect { startHour ->
                 _uiState.value = _uiState.value.copy(nightStartHour = startHour)
+                // Recalculate energy levels when night hours change
+                calculateEnergyLevels()
             }
         }
         viewModelScope.launch {
             preferencesManager.nightEndHour.collect { endHour ->
                 _uiState.value = _uiState.value.copy(nightEndHour = endHour)
+                // Recalculate energy levels when night hours change
+                calculateEnergyLevels()
             }
         }
         viewModelScope.launch {
@@ -119,6 +128,10 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
             MainActivity.appForegroundFlow.collect {
                 calculateSleepDebt()
                 calculateEnergyLevels()
+                // Check if we should dismiss today's notification
+                _uiState.value.energyLevelsInfo?.energyPoints?.find { it.type == EnergyPointType.WAKE_UP }?.let { wakeUpPoint ->
+                    notificationHelper.dismissTodayNotification(wakeUpPoint.time, _uiState.value.neededSleepHours)
+                }
             }
         }
 
@@ -374,6 +387,8 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 
                 // Calculate energy points using current wake-up time
                 val energyPoints = currentWakeUpTime?.let { wakeUpTime ->
+                    // Schedule notifications when wake-up time changes
+                    notificationHelper.scheduleEnergyNotifications(wakeUpTime, _uiState.value.neededSleepHours)
                     calculateEnergyTimePoints(wakeUpTime)
                 } ?: emptyList()
 

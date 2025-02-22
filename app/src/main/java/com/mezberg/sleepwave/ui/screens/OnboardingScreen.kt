@@ -8,10 +8,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mezberg.sleepwave.viewmodel.OnboardViewModel
 import androidx.compose.foundation.background
-
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun OnboardingScreen(
@@ -30,7 +32,7 @@ fun OnboardingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(42.dp),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -49,14 +51,21 @@ fun OnboardingScreen(
             )
         }
 
-        // Content will be added in next steps
-        Box(
+        // Content area
+        Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Step ${uiState.currentStep + 1}")
+            Text(
+                text = uiState.currentStepContent,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         // Navigation buttons

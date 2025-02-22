@@ -19,7 +19,12 @@ import kotlinx.coroutines.launch
 import com.mezberg.sleepwave.data.SleepPreferencesManager
 import com.mezberg.sleepwave.data.SleepDatabase
 import androidx.lifecycle.viewmodel.compose.viewModel
-
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.mezberg.sleepwave.utils.PermissionUtils
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -30,6 +35,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var sleepPreferencesManager: SleepPreferencesManager
     private lateinit var sleepDatabase: SleepDatabase
 
+    // Permission launcher
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        // Handle permission result if needed
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sleepPreferencesManager = SleepPreferencesManager(applicationContext)
@@ -38,6 +50,9 @@ class MainActivity : ComponentActivity() {
             SleepDatabase::class.java,
             "sleep_database"
         ).build()
+
+        // Check notification permission on launch
+        checkNotificationPermission()
 
         // Observe lifecycle to detect foreground state
         lifecycleScope.launch {
@@ -63,6 +78,27 @@ class MainActivity : ComponentActivity() {
                 sleepTrackingViewModel = sleepTrackingViewModel,
                 onboardViewModel = onboardViewModel
             )
+        }
+    }
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    // Permission is already granted
+                }
+                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
+                    // Show rationale if needed and then request permission
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                else -> {
+                    // Request permission
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
         }
     }
 }

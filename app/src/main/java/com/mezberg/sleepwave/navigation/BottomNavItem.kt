@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mezberg.sleepwave.R
 
@@ -18,10 +19,16 @@ sealed class BottomNavItem(
         icon = Icons.Default.Home
     )
     
-    object Analysis : BottomNavItem(
-        route = "analysis",
-        titleResId = R.string.analysis,
+    object Sleeps : BottomNavItem(
+        route = "sleeps",
+        titleResId = R.string.sleeps,
         icon = Icons.Default.Science
+    )
+
+    object Graphs : BottomNavItem(
+        route = "graphs",
+        titleResId = R.string.graphs,
+        icon = Icons.Default.BarChart
     )
     
     object Settings : BottomNavItem(
@@ -31,6 +38,6 @@ sealed class BottomNavItem(
     )
 
     companion object {
-        val items = listOf(Home, Analysis, Settings)
+        val items = listOf(Home, Sleeps, Graphs, Settings)
     }
 } 
