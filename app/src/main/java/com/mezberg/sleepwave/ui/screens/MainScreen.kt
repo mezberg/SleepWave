@@ -115,7 +115,7 @@ fun SleepDebtDisplay(
                 )
 
                 Text(
-                    text = "${sleepDebtHours}h ${sleepDebtMinutes}m",
+                    text = if (sleepDebt > 0) "-${sleepDebtHours}h ${sleepDebtMinutes}m" else "${sleepDebtHours}h ${sleepDebtMinutes}m",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold

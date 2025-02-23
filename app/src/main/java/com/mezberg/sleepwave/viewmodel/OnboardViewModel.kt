@@ -17,7 +17,7 @@ data class OnboardingState(
     val currentStepContent: String
         get() = when (currentStep) {
             0 -> """
-                **What is Sleep Debt?**
+                What is Sleep Debt?
                 
                 Sleep debt is the total amount of sleep you've missed compared to your ideal sleep duration. The more debt you accumulate, the harder it is for your body to fully recover.
                 

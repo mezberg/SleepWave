@@ -14,6 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -25,15 +28,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.mezberg.sleepwave.navigation.BottomNavItem
-import com.mezberg.sleepwave.ui.screens.MainScreen
-import com.mezberg.sleepwave.ui.screens.OnboardingScreen
-import com.mezberg.sleepwave.ui.screens.SettingsScreen
-import com.mezberg.sleepwave.ui.screens.SleepTrackingScreen
-import com.mezberg.sleepwave.ui.screens.SleepGraphsScreen
+import com.mezberg.sleepwave.ui.screens.*
 import com.mezberg.sleepwave.ui.theme.SleepWaveTheme
 import com.mezberg.sleepwave.viewmodel.SleepTrackingViewModel
 import com.mezberg.sleepwave.viewmodel.MainScreenViewModel
 import com.mezberg.sleepwave.viewmodel.OnboardViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -46,8 +46,16 @@ fun SleepWaveApp(
         val navController = rememberNavController()
         val context = LocalContext.current
         val hasCompletedOnboarding by onboardViewModel.uiState.collectAsState()
+        val isLoading = remember { mutableStateOf(true) }
 
-        if (!hasCompletedOnboarding.hasCompletedOnboarding) {
+        LaunchedEffect(Unit) {
+            delay(1000) // Show loading screen for 1 second
+            isLoading.value = false
+        }
+
+        if (isLoading.value) {
+            LoadingScreen()
+        } else if (!hasCompletedOnboarding.hasCompletedOnboarding) {
             OnboardingScreen(
                 viewModel = onboardViewModel,
                 onOnboardingComplete = {
