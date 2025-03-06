@@ -8,9 +8,9 @@ import androidx.compose.ui.graphics.Color
 object MaterialColors {
     // Primary brand colors
     val Blue = Color(0xFF2196F3)
-    val Teal = Color(0xFF03DAC6)
-    val DeepPurple = Color(0xFF3700B3)
-    val Orange = Color(0xFFFF9800)  // Adding Material Orange
+    val LightBlue = Color(0xFF64B5F6)  // Light Blue variant
+    val DarkBlue = Color(0xFF1976D2)   // Dark Blue variant
+    val Orange = Color(0xFFFF9800)     // Material Orange
 
     // Neutral colors
     val White = Color(0xFFFFFFFF)
@@ -26,7 +26,7 @@ object MaterialColors {
  * Graph Colors
  */
 object GraphColors {
-    val Primary = Color(0xFF000000)
+    val Primary = Blue
     val OutlineVariant = Color(0xFFD3D3D3)
 }
 
@@ -40,8 +40,8 @@ object SleepColors {
 
 // Expose commonly used colors at the top level for convenience
 val Blue = MaterialColors.Blue
-val Teal = MaterialColors.Teal
-val DeepPurple = MaterialColors.DeepPurple
+val LightBlue = MaterialColors.LightBlue
+val DarkBlue = MaterialColors.DarkBlue
 val White = MaterialColors.White
 val Black = MaterialColors.Black
 val DarkBackground = MaterialColors.DarkBackground

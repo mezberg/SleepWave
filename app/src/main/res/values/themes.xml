@@ -3,8 +3,8 @@
 
     <style name="Theme.SleepWave" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
-        <item name="colorPrimaryDark">@color/purple_700</item>
-        <item name="colorAccent">@color/teal_200</item>
+        <item name="colorPrimaryDark">@color/dark_blue</item>
+        <item name="colorAccent">@color/primary_blue</item>
         <item name="android:windowBackground">@color/white</item>
         <item name="android:statusBarColor">?attr/colorPrimaryDark</item>
     </style>

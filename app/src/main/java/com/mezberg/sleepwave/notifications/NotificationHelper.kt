@@ -12,6 +12,9 @@ import androidx.core.content.ContextCompat
 import com.mezberg.sleepwave.R
 import java.util.Calendar
 import java.util.Date
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 class NotificationHelper(private val context: Context) {
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -111,6 +114,37 @@ class NotificationHelper(private val context: Context) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             alarmManager.cancel(pendingIntent)
+        }
+    }
+
+    fun scheduleNotifications() {
+        // Get the user's preferences
+        val preferencesManager = com.mezberg.sleepwave.data.SleepPreferencesManager(context)
+        
+        // Create a coroutine scope to collect the preferences
+        MainScope().launch {
+            try {
+                // Get the night end hour (wake up time)
+                val nightEndHour = preferencesManager.nightEndHour.first()
+                val neededSleepHours = preferencesManager.neededSleepHours.first()
+                
+                // Create a date for the wake up time
+                val calendar = Calendar.getInstance()
+                calendar.set(Calendar.HOUR_OF_DAY, nightEndHour)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                
+                // If the time has already passed today, schedule for tomorrow
+                if (calendar.timeInMillis < System.currentTimeMillis()) {
+                    calendar.add(Calendar.DAY_OF_YEAR, 1)
+                }
+                
+                // Schedule the notifications
+                scheduleEnergyNotifications(calendar.time, neededSleepHours)
+            } catch (e: Exception) {
+                // Log the error but don't crash
+                android.util.Log.e("NotificationHelper", "Error scheduling notifications", e)
+            }
         }
     }
 } 

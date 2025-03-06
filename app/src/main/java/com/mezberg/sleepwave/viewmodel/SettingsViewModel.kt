@@ -120,32 +120,38 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleNotifications(enabled: Boolean) {
-        if (enabled && !PermissionUtils.hasNotificationPermission(getApplication())) {
-            // Show permission request dialog
+        if (enabled) {
+            // Always request permission when trying to enable notifications
+            // This will trigger the permission dialog if it was previously denied
             _uiState.value = _uiState.value.copy(showNotificationPermissionRequest = true)
             return
         }
 
         viewModelScope.launch {
-            if (enabled) {
-                // Re-enable notifications
-                preferencesManager.updateNotificationsEnabled(true)
-            } else {
-                // Disable and cancel all notifications
-                preferencesManager.updateNotificationsEnabled(false)
-                notificationHelper.cancelAllScheduledNotifications()
-            }
+            // Disable and cancel all notifications
+            preferencesManager.updateNotificationsEnabled(false)
+            notificationHelper.cancelAllScheduledNotifications()
         }
     }
 
     fun onNotificationPermissionResult(granted: Boolean) {
         _uiState.value = _uiState.value.copy(showNotificationPermissionRequest = false)
-        if (granted) {
-            viewModelScope.launch {
-                preferencesManager.updateNotificationsEnabled(true)
+        
+        viewModelScope.launch {
+            if (granted) {
+                try {
+                    // Enable notifications and schedule them
+                    preferencesManager.updateNotificationsEnabled(true)
+                    notificationHelper.scheduleNotifications()
+                } catch (e: Exception) {
+                    // Log the error but don't crash
+                    android.util.Log.e("SettingsViewModel", "Error enabling notifications", e)
+                }
+            } else {
+                // Update UI to reflect that notifications are still disabled
+                preferencesManager.updateNotificationsEnabled(false)
+                _uiState.value = _uiState.value.copy(notificationsEnabled = false)
             }
-        } else {
-            _uiState.value = _uiState.value.copy(notificationsEnabled = false)
         }
     }
 } 

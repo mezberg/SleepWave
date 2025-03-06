@@ -3,13 +3,15 @@
     <!-- System colors -->
     <color name="status_bar">@color/primary_blue</color>
     <color name="primary_blue">#2196F3</color>
+    <color name="light_blue">#64B5F6</color>
+    <color name="dark_blue">#1976D2</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
 
     <!-- Material Theme colors -->
-    <color name="primary">#2196F3</color>
-    <color name="purple_700">#3700B3</color>
-    <color name="teal_200">#03DAC5</color>
+    <color name="primary">@color/primary_blue</color>
+    <color name="secondary">@color/primary_blue</color>
+    <color name="tertiary">@color/primary_blue</color>
 
     <!-- Dialog theme colors -->
     <color name="dialog_primary">@color/primary</color>

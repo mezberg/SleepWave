@@ -17,4 +17,5 @@
     <string name="notification_text">Time to check your energy levels and plan your activities!</string>
     <string name="notifications">Notifications</string>
     <string name="notifications_description">Enable or disable energy schedule notifications. When enabled, you\'ll receive daily reminders to check your energy levels.</string>
+    <string name="notifications_permission_denied">Notification permission is required. Please enable notifications in system settings if you want to receive reminders.</string>
 </resources>

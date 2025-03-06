@@ -25,6 +25,7 @@ import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.mezberg.sleepwave.utils.PermissionUtils
+import com.mezberg.sleepwave.notifications.NotificationHelper
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -50,6 +51,10 @@ class MainActivity : ComponentActivity() {
             SleepDatabase::class.java,
             "sleep_database"
         ).build()
+
+        // Create notification channel
+        val notificationHelper = NotificationHelper(applicationContext)
+        notificationHelper.createNotificationChannel()
 
         // Check notification permission on launch
         checkNotificationPermission()

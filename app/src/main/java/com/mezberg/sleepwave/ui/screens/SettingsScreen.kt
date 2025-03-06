@@ -22,6 +22,9 @@ import kotlin.math.roundToInt
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.SliderDefaults
+import com.mezberg.sleepwave.utils.PermissionUtils
 
 
 @Composable
@@ -219,13 +222,27 @@ fun SettingsScreen(
                         checked = uiState.notificationsEnabled,
                         onCheckedChange = { enabled ->
                             viewModel.toggleNotifications(enabled)
-                        }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                            checkedBorderColor = MaterialTheme.colorScheme.primary,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            uncheckedBorderColor = MaterialTheme.colorScheme.outline
+                        )
                     )
                 }
                 Text(
-                    text = stringResource(R.string.notifications_description),
+                    text = if (!uiState.notificationsEnabled && !PermissionUtils.hasNotificationPermission(context))
+                        stringResource(R.string.notifications_permission_denied)
+                    else
+                        stringResource(R.string.notifications_description),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (!uiState.notificationsEnabled && !PermissionUtils.hasNotificationPermission(context))
+                        MaterialTheme.colorScheme.error
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -262,7 +279,12 @@ fun SettingsScreen(
                         viewModel.updateTempNeededSleepHours(roundedHours)
                     },
                     valueRange = 4f..12f,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.primaryContainer
+                    )
                 )
 
                 Row(

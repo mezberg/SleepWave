@@ -96,9 +96,9 @@ fun EnergyLevelsGraph(
                 }
                 
                 // Extract colors before Canvas
-                val primaryColor = MaterialTheme.colorScheme.primary
+                val primaryColor = Blue // Use Blue instead of MaterialTheme.colorScheme.primary
                 val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
-                val currentTimeColor = Orange // Using our new Orange color
+                val currentTimeColor = Blue // Use Blue instead of Orange
                 val density = LocalDensity.current
 
                 Box(

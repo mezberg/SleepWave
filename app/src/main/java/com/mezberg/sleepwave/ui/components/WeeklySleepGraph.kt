@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
 import java.util.*
-import com.mezberg.sleepwave.ui.theme.GraphPrimary
+import com.mezberg.sleepwave.ui.theme.Blue
 import com.mezberg.sleepwave.ui.theme.GraphOutlineVariant
 
 data class DailySleepData(
@@ -45,7 +45,7 @@ fun WeeklySleepGraph(
     // Remember colors to avoid recomposition issues
     val colors = remember {
         object {
-            val primary = GraphPrimary
+            val primary = Blue // Use our blue color instead of GraphPrimary
             val outlineVariant = GraphOutlineVariant
         }
     }
